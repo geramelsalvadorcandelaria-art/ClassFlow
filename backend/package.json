@@ -1,0 +1,17 @@
+{
+  "name": "classflow-backend",
+  "version": "1.0.0",
+  "description": "ClassFlow API – Node.js + Express + TypeScript + Prisma + PostgreSQL",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:studio": "prisma studio"
+  },
+  "keywords": [],
+  "license": "MIT"
+}

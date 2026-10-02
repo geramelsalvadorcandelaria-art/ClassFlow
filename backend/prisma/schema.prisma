@@ -1,0 +1,210 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User (Teacher) ──────────────────────────────────────────
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(TEACHER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  courses Course[]
+
+  @@map("users")
+}
+
+enum Role {
+  TEACHER
+  ADMIN
+}
+
+// ─── Academic Period ─────────────────────────────────────────
+model AcademicPeriod {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  courses Course[]
+
+  @@map("academic_periods")
+}
+
+// ─── Course ──────────────────────────────────────────────────
+model Course {
+  id          String        @id @default(cuid())
+  name        String
+  code        String
+  description String?
+  group       String
+  room        String
+  schedule    String
+  startDate   DateTime
+  endDate     DateTime
+  status      CourseStatus  @default(ACTIVE)
+  teacherId   String
+  periodId    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  teacher      User            @relation(fields: [teacherId], references: [id])
+  period       AcademicPeriod? @relation(fields: [periodId], references: [id])
+  enrollments  Enrollment[]
+  evaluations  Evaluation[]
+  attendance   Attendance[]
+  schedules    ClassSchedule[]
+
+  @@index([teacherId])
+  @@map("courses")
+}
+
+enum CourseStatus {
+  ACTIVE
+  COMPLETED
+  DRAFT
+}
+
+// ─── Student ─────────────────────────────────────────────────
+model Student {
+  id        String        @id @default(cuid())
+  firstName String
+  lastName  String
+  studentId String        @unique
+  email     String?
+  phone     String?
+  photo     String?
+  status    StudentStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  enrollments Enrollment[]
+  grades      Grade[]
+  attendance  Attendance[]
+
+  @@index([studentId])
+  @@map("students")
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  WITHDRAWN
+}
+
+// ─── Enrollment ───────────────────────────────────────────────
+model Enrollment {
+  id         String   @id @default(cuid())
+  studentId  String
+  courseId   String
+  enrolledAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+// ─── Class Schedule ───────────────────────────────────────────
+model ClassSchedule {
+  id        String  @id @default(cuid())
+  courseId  String
+  dayOfWeek Int     // 0=Mon, 6=Sun
+  startTime String  // "08:00"
+  endTime   String  // "09:30"
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@map("class_schedules")
+}
+
+// ─── Attendance ───────────────────────────────────────────────
+model Attendance {
+  id        String           @id @default(cuid())
+  studentId String
+  courseId  String
+  date      DateTime         @db.Date
+  status    AttendanceStatus @default(PRESENT)
+  note      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId, date])
+  @@index([courseId, date])
+  @@map("attendance")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  JUSTIFIED
+}
+
+// ─── Evaluation ───────────────────────────────────────────────
+model Evaluation {
+  id          String         @id @default(cuid())
+  courseId    String
+  period      String         @default("P1")
+  name        String
+  type        EvaluationType @default(EXAM)
+  date        DateTime       @db.Date
+  description String?
+  maxScore    Float
+  weight      Float          // 0-100 percentage
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  grades Grade[]
+
+  @@index([courseId])
+  @@map("evaluations")
+}
+
+enum EvaluationType {
+  EXAM
+  TASK
+  QUIZ
+  PROJECT
+  PARTICIPATION
+  WORK
+  OTHER
+}
+
+// ─── Grade ───────────────────────────────────────────────────
+model Grade {
+  id           String   @id @default(cuid())
+  studentId    String
+  evaluationId String
+  score        Float
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, evaluationId])
+  @@index([evaluationId])
+  @@map("grades")
+}
