@@ -8,12 +8,41 @@ export type StudentStatus = 'active' | 'inactive' | 'withdrawn';
 export type CourseStatus = 'active' | 'completed' | 'draft';
 export type AlertType = 'low_grade' | 'low_attendance' | 'consecutive_absences';
 
-// ─── User ───────────────────────────────────────────────────
+// ─── User & Permissions ─────────────────────────────────────
+export type UserRole = 'admin' | 'teacher' | 'coordinator' | 'student';
+
+export interface SystemModuleConfig {
+  dashboard: boolean;
+  courses: boolean;
+  students: boolean;
+  attendance: boolean;
+  grades: boolean;
+  exams: boolean;
+  reports: boolean;
+  settings: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success' | 'alert';
+  timestamp: string;
+  read: boolean;
+  link?: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'teacher';
+  role: UserRole;
+  password?: string;
+  photo?: string;
+  phone?: string;
+  department?: string;
+  active?: boolean;
+  permissions?: Partial<SystemModuleConfig>;
   createdAt: string;
 }
 

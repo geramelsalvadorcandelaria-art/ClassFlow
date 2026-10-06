@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { Plus, Trash2, FileText, Calendar, Layers, CheckCircle2 } from 'lucide-react'
-import { Button, Card, Badge, Modal, Input, Select, Textarea, PageHeader, EmptyState } from '@/components/ui'
-import { db, MOCK_COURSES } from '@/lib/mockData'
+import { Button, Card, Badge, Modal, Input, Select, Textarea, PageHeader, EmptyState, ConfirmDialog } from '@/components/ui'
+import { db, useCourses } from '@/lib/mockData'
 import { useAppStore } from '@/store'
 import { toast } from '@/store'
 import {
@@ -47,6 +47,7 @@ function ExamForm({
   onClose: () => void
   onSuccess: () => void
 }) {
+  const courses = useCourses()
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<ExamFormData>({
     resolver: zodResolver(schema) as never,
     defaultValues: {
@@ -102,8 +103,10 @@ function ExamForm({
         <div>
           <label className="block text-xs font-semibold mb-1 text-[var(--color-foreground)]">Curso</label>
           <select className="form-select text-sm w-full" {...register('courseId')}>
-            {MOCK_COURSES.map((c) => (
-              <option key={c.id} value={c.id}>{c.name} ({c.group})</option>
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}{c.room ? ` (Aula ${c.room})` : (c.group ? ` (${c.group})` : '')}
+              </option>
             ))}
           </select>
         </div>
@@ -161,7 +164,7 @@ function EvalCard({
   allEvaluations: Evaluation[]
   onDelete: (e: Evaluation) => void
 }) {
-  const course = MOCK_COURSES.find((c) => c.id === ev.courseId)
+  const course = db.courses.get(ev.courseId)
   const students = db.students.list(ev.courseId).filter((s) => s.status === 'active')
   const grades = db.grades.listByEval(ev.courseId, ev.id)
   const graded = grades.length
@@ -239,14 +242,16 @@ function EvalCard({
 
 export default function ExamsPage() {
   const { selectedCourseId } = useAppStore()
+  const courses = useCourses()
   const [filterCourse, setFilterCourse] = useState(selectedCourseId ?? '')
   const [filterPeriod, setFilterPeriod] = useState<string>('')
   const [modalOpen, setModalOpen] = useState(false)
   const [refreshCount, setRefreshCount] = useState(0)
+  const [evalToDelete, setEvalToDelete] = useState<Evaluation | null>(null)
 
   const allEvals = useMemo(() => {
-    return MOCK_COURSES.flatMap((c) => db.evaluations.list(c.id))
-  }, [refreshCount])
+    return courses.flatMap((c) => db.evaluations.list(c.id))
+  }, [courses, refreshCount])
 
   const filtered = useMemo(() => {
     return allEvals.filter((e) => {
@@ -257,11 +262,15 @@ export default function ExamsPage() {
   }, [allEvals, filterCourse, filterPeriod])
 
   const handleDelete = (e: Evaluation) => {
-    if (confirm(`¿Eliminar "${e.name}"? Los pesos del criterio se redistribuirán dinámicamente.`)) {
-      db.evaluations.delete(e.courseId, e.id)
-      toast.success('Evaluación eliminada', 'Pesos recalculados')
-      setRefreshCount((c) => c + 1)
-    }
+    setEvalToDelete(e)
+  }
+
+  const confirmDeleteEval = () => {
+    if (!evalToDelete) return
+    db.evaluations.delete(evalToDelete.courseId, evalToDelete.id)
+    toast.success('Evaluación eliminada')
+    setRefreshCount((c) => c + 1)
+    setEvalToDelete(null)
   }
 
   return (
@@ -289,7 +298,11 @@ export default function ExamsPage() {
                 aria-label="Filtrar por curso"
               >
                 <option value="">Todos los cursos</option>
-                {MOCK_COURSES.map((c) => <option key={c.id} value={c.id}>{c.name} – {c.group}</option>)}
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}{c.room ? ` (Aula ${c.room})` : (c.group ? ` (${c.group})` : '')}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -364,13 +377,24 @@ export default function ExamsPage() {
         maxWidth="lg"
       >
         <ExamForm
-          courseId={filterCourse || MOCK_COURSES[0].id}
+          courseId={filterCourse || courses[0]?.id || ''}
           initialPeriod={(filterPeriod as PeriodId) || 'P1'}
           existingEvals={allEvals}
           onClose={() => setModalOpen(false)}
           onSuccess={() => setRefreshCount((c) => c + 1)}
         />
       </Modal>
+
+      {/* Confirmación para Eliminar Evaluación */}
+      <ConfirmDialog
+        open={!!evalToDelete}
+        onClose={() => setEvalToDelete(null)}
+        onConfirm={confirmDeleteEval}
+        title="Eliminar evaluación"
+        message={`¿Eliminar "${evalToDelete?.name}"? Los pesos del criterio se redistribuirán dinámicamente.`}
+        confirmLabel="Eliminar evaluación"
+        danger
+      />
     </>
   )
 }

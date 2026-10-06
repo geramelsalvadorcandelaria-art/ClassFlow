@@ -35,9 +35,10 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   hint?: string
   required?: boolean
   leftIcon?: React.ReactNode
+  rightIcon?: React.ReactNode
 }
 
-export function Input({ label, error, hint, required, leftIcon, className, id, ...props }: InputProps) {
+export function Input({ label, error, hint, required, leftIcon, rightIcon, className, id, ...props }: InputProps) {
   const inputId = id ?? `input-${label?.toLowerCase().replace(/\s+/g, '-')}`
   return (
     <div className="flex flex-col gap-1">
@@ -50,9 +51,10 @@ export function Input({ label, error, hint, required, leftIcon, className, id, .
         {leftIcon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]">{leftIcon}</span>}
         <input
           id={inputId}
-          className={cn('form-input', error && 'error', leftIcon && 'pl-9', className)}
+          className={cn('form-input', error && 'error', leftIcon && 'pl-9', rightIcon && 'pr-10', className)}
           {...props}
         />
+        {rightIcon && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] flex items-center">{rightIcon}</span>}
       </div>
       {error && <p className="form-error">{error}</p>}
       {hint && !error && <p className="form-hint">{hint}</p>}

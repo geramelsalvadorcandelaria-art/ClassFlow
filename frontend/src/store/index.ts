@@ -1,31 +1,261 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { User } from '@/types'
+import type { User, SystemModuleConfig, AppNotification } from '@/types'
 import { storage } from '@/lib/utils'
+import { db, onUsersSync } from '@/lib/mockData'
+
+export const DEFAULT_SYSTEM_MODULES: SystemModuleConfig = {
+  dashboard: true,
+  courses: true,
+  students: true,
+  attendance: true,
+  grades: true,
+  exams: true,
+  reports: true,
+  settings: true,
+}
+
+export const INITIAL_USERS: User[] = [
+  {
+    id: 'u-geramel',
+    name: 'Geramel Salvador Candelaria',
+    email: 'geramelsalvadorcandelaria@gmail.com',
+    role: 'admin',
+    password: 'admin',
+    photo: '',
+    department: 'Dirección General',
+    phone: '+1 (555) 019-2831',
+    active: true,
+    createdAt: '2026-01-10T00:00:00Z',
+  },
+  {
+    id: 'u-pedro',
+    name: 'PEDRO',
+    email: 'pjceballos12@gmail.com',
+    role: 'admin',
+    password: 'demo',
+    photo: '',
+    department: 'Dirección General',
+    phone: '+1 (555) 987-6543',
+    active: true,
+    createdAt: '2026-02-01T00:00:00Z',
+  },
+  {
+    id: 'u1',
+    name: 'Prof. García',
+    email: 'profesor@classflow.com',
+    role: 'teacher',
+    password: 'demo',
+    photo: '',
+    department: 'Ciencias y Tecnología',
+    phone: '+1 (555) 234-5678',
+    active: true,
+    createdAt: '2026-02-15T00:00:00Z',
+  },
+  {
+    id: 'u-coord',
+    name: 'Lic. Fernández',
+    email: 'coordinacion@classflow.com',
+    role: 'coordinator',
+    password: 'coord',
+    photo: '',
+    department: 'Coordinación Académica',
+    phone: '+1 (555) 876-5432',
+    active: true,
+    createdAt: '2026-03-01T00:00:00Z',
+  },
+]
+
+export const INITIAL_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: 'notif-1',
+    title: 'Alumnos en riesgo académico',
+    message: 'Hay 8 estudiantes con promedio inferior al 70% o asistencia crítica.',
+    type: 'alert',
+    timestamp: 'Hace 15 min',
+    read: false,
+    link: '/reports',
+  },
+  {
+    id: 'notif-2',
+    title: 'Evaluaciones pendientes',
+    message: 'Examen Parcial 2 tiene calificaciones pendientes por ingresar.',
+    type: 'warning',
+    timestamp: 'Hace 2 horas',
+    read: false,
+    link: '/exams',
+  },
+  {
+    id: 'notif-3',
+    title: 'Nuevo período escolar activo',
+    message: 'El Período P1 está próximo a su cierre de ponderación.',
+    type: 'info',
+    timestamp: 'Ayer',
+    read: false,
+    link: '/grades',
+  },
+]
 
 interface AuthState {
   user: User | null
   token: string | null
   isAuthenticated: boolean
+  users: User[]
+  systemModules: SystemModuleConfig
+  notifications: AppNotification[]
   login: (user: User, token: string) => void
   logout: () => void
+  setUsers: (users: User[]) => void
+  updateUser: (data: Partial<User>) => void
+  createUser: (data: Omit<User, 'id' | 'createdAt'>) => User
+  updateUserById: (id: string, data: Partial<User>) => void
+  deleteUser: (id: string) => boolean
+  toggleSystemModule: (moduleKey: keyof SystemModuleConfig, force?: boolean) => void
+  switchUser: (userId: string) => void
+  markNotificationRead: (id: string) => void
+  markAllNotificationsRead: () => void
+  clearNotification: (id: string) => void
+  addNotification: (notif: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => void
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
-      login: (user, token) => set({ user, token, isAuthenticated: true }),
+      users: INITIAL_USERS,
+      systemModules: DEFAULT_SYSTEM_MODULES,
+      notifications: INITIAL_NOTIFICATIONS,
+
+      login: (user, token) => {
+        const currentUsers = get().users
+        const exists = currentUsers.find((u) => u.id === user.id)
+        const updatedUsers = exists
+          ? currentUsers.map((u) => (u.id === user.id ? { ...u, ...user } : u))
+          : [...currentUsers, user]
+        set({ user, token, isAuthenticated: true, users: updatedUsers })
+        db.users.sync(updatedUsers)
+      },
+
       logout: () => {
         storage.remove('auth')
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('classflow-auth-v3')
+            localStorage.removeItem('classflow-auth-v2')
+          } catch {}
+        }
         set({ user: null, token: null, isAuthenticated: false })
       },
+
+      setUsers: (users) => {
+        const cur = get().user
+        if (cur) {
+          const freshCur = users.find((u) => u.id === cur.id)
+          set({ users, user: freshCur ? { ...cur, ...freshCur } : cur })
+        } else {
+          set({ users })
+        }
+      },
+
+      updateUser: (data) => {
+        const cur = get().user
+        if (!cur) return
+        const updated = { ...cur, ...data }
+        const updatedUsers = get().users.map((u) => (u.id === cur.id ? updated : u))
+        set({ user: updated, users: updatedUsers })
+        db.users.sync(updatedUsers)
+      },
+
+      createUser: (data) => {
+        const newUser: User = {
+          ...data,
+          id: `u-${Date.now()}`,
+          active: data.active ?? true,
+          createdAt: new Date().toISOString(),
+        }
+        const updatedUsers = [...get().users, newUser]
+        set({ users: updatedUsers })
+        db.users.sync(updatedUsers)
+        return newUser
+      },
+
+      updateUserById: (id, data) => {
+        const updatedUsers = get().users.map((u) => (u.id === id ? { ...u, ...data } : u))
+        const cur = get().user
+        const updatedCurrent = cur && cur.id === id ? { ...cur, ...data } : cur
+        set({ users: updatedUsers, user: updatedCurrent })
+        db.users.sync(updatedUsers)
+      },
+
+      deleteUser: (id) => {
+        const cur = get().user
+        if (cur?.id === id) return false // Prevent deleting yourself
+        const updatedUsers = get().users.filter((u) => u.id !== id)
+        set({ users: updatedUsers })
+        db.users.sync(updatedUsers)
+        return true
+      },
+
+      toggleSystemModule: (moduleKey, force) => {
+        set((s) => ({
+          systemModules: {
+            ...s.systemModules,
+            [moduleKey]: force !== undefined ? force : !s.systemModules[moduleKey],
+          },
+        }))
+      },
+
+      switchUser: (userId) => {
+        const target = get().users.find((u) => u.id === userId)
+        if (target) {
+          set({ user: target, isAuthenticated: true })
+        }
+      },
+
+      markNotificationRead: (id) => {
+        set((s) => ({
+          notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        }))
+      },
+
+      markAllNotificationsRead: () => {
+        set((s) => ({
+          notifications: s.notifications.map((n) => ({ ...n, read: true })),
+        }))
+      },
+
+      clearNotification: (id) => {
+        set((s) => ({
+          notifications: s.notifications.filter((n) => n.id !== id),
+        }))
+      },
+
+      addNotification: (notif) => {
+        const newNotif: AppNotification = {
+          ...notif,
+          id: `notif-${Date.now()}`,
+          timestamp: 'Justo ahora',
+          read: false,
+        }
+        set((s) => ({
+          notifications: [newNotif, ...s.notifications],
+        }))
+      },
     }),
-    { name: 'classflow-auth' }
+    {
+      name: 'classflow-auth-v3',
+    }
   )
 )
+
+// Sincronizar usuarios cuando lleguen desde el servidor central / base de datos
+onUsersSync((syncedUsers) => {
+  if (Array.isArray(syncedUsers) && syncedUsers.length > 0) {
+    useAuthStore.getState().setUsers(syncedUsers)
+  }
+})
 
 // ─── App UI State ─────────────────────────────────────────────
 interface AppState {

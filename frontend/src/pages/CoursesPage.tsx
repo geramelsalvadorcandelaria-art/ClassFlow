@@ -2,9 +2,8 @@ import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, BookOpen, Users, Star, ClipboardCheck, MoreVertical, ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import { Card, Button, Badge, Modal, Input, Select, Textarea, ProgressBar, EmptyState, PageHeader, ConfirmDialog } from '@/components/ui'
-import { db } from '@/lib/mockData'
-import { useAppStore } from '@/store'
-import { toast } from '@/store'
+import { db, useCourses } from '@/lib/mockData'
+import { useAppStore, useAuthStore, toast } from '@/store'
 import { cn, courseStatusLabels, formatDate } from '@/lib/utils'
 import type { Course, CreateCourseForm, CourseStatus } from '@/types'
 import { useForm } from 'react-hook-form'
@@ -13,14 +12,11 @@ import { z } from 'zod'
 
 const schema = z.object({
   name: z.string().min(2, 'Nombre requerido'),
-  code: z.string().min(2, 'Código requerido'),
-  description: z.string().optional(),
-  group: z.string().min(1, 'Grupo requerido'),
   room: z.string().min(1, 'Aula requerida'),
   schedule: z.string().min(2, 'Horario requerido'),
-  startDate: z.string().min(1, 'Fecha de inicio requerida'),
-  endDate: z.string().min(1, 'Fecha de fin requerida'),
 })
+
+type CourseFormData = z.infer<typeof schema>
 
 function CourseCard({ course, onEdit, onDelete }: { course: Course; onEdit: (c: Course) => void; onDelete: (c: Course) => void }) {
   const { setSelectedCourse } = useAppStore()
@@ -41,7 +37,7 @@ function CourseCard({ course, onEdit, onDelete }: { course: Course; onEdit: (c: 
           </div>
           <div>
             <h3 className="font-semibold text-sm leading-tight">{course.name}</h3>
-            <p className="text-xs text-[var(--color-muted)]">{course.code} · Grupo {course.group}</p>
+            <p className="text-xs text-[var(--color-muted)]">Aula {course.room}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -67,10 +63,13 @@ function CourseCard({ course, onEdit, onDelete }: { course: Course; onEdit: (c: 
       </div>
 
       {/* Info */}
-      <div className="grid grid-cols-2 gap-2 text-xs text-[var(--color-muted)]">
-        <div>📍 Aula {course.room}</div>
-        <div>🕐 {course.schedule}</div>
-        <div>📅 {formatDate(course.startDate)}</div>
+      <div className="space-y-1.5 text-xs text-[var(--color-muted)]">
+        <div className="flex items-start gap-1.5">
+          <span className="flex-shrink-0">🕐</span>
+          <span className="font-medium text-[var(--color-foreground)] line-clamp-2">
+            {course.schedule || 'Sin horario definido'}
+          </span>
+        </div>
         <div>👥 {course.studentCount} estudiantes</div>
       </div>
 
@@ -105,65 +104,314 @@ function CourseCard({ course, onEdit, onDelete }: { course: Course; onEdit: (c: 
   )
 }
 
+interface ScheduleBlock {
+  id: string
+  day: string
+  dayShort: string
+  startTime: string
+  endTime: string
+}
+
+const WEEK_DAYS = [
+  { full: 'Lunes', short: 'Lun' },
+  { full: 'Martes', short: 'Mar' },
+  { full: 'Miércoles', short: 'Mié' },
+  { full: 'Jueves', short: 'Jue' },
+  { full: 'Viernes', short: 'Vie' },
+  { full: 'Sábado', short: 'Sáb' },
+  { full: 'Domingo', short: 'Dom' },
+]
+
+function parseScheduleToBlocks(scheduleStr: string): ScheduleBlock[] {
+  if (!scheduleStr) return []
+  const blocks: ScheduleBlock[] = []
+  const parts = scheduleStr.split(',').map((p) => p.trim()).filter(Boolean)
+
+  for (const part of parts) {
+    const timeMatch = part.match(/(\d{1,2}:\d{2})\s*(?:-|a|–)\s*(\d{1,2}:\d{2})/)
+    const start = timeMatch ? timeMatch[1].padStart(5, '0') : '08:00'
+    const end = timeMatch ? timeMatch[2].padStart(5, '0') : '09:30'
+
+    for (const d of WEEK_DAYS) {
+      if (new RegExp(`\\b${d.short}\\b|\\b${d.full}\\b`, 'i').test(part)) {
+        blocks.push({
+          id: `blk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          day: d.full,
+          dayShort: d.short,
+          startTime: start,
+          endTime: end,
+        })
+      }
+    }
+  }
+  return blocks
+}
+
+function formatBlocksToSchedule(blocks: ScheduleBlock[]): string {
+  if (blocks.length === 0) return ''
+  return blocks
+    .map((b) => `${b.dayShort} ${b.startTime}-${b.endTime}`)
+    .join(', ')
+}
+
 function CourseForm({ course, onClose }: { course?: Course; onClose: () => void }) {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CreateCourseForm>({
+  const { user } = useAuthStore()
+  const initialSchedule = course?.schedule ?? ''
+  const [scheduleBlocks, setScheduleBlocks] = useState<ScheduleBlock[]>(() =>
+    parseScheduleToBlocks(initialSchedule)
+  )
+  const [customSchedule, setCustomSchedule] = useState(initialSchedule)
+
+  // New block inputs
+  const [newDay, setNewDay] = useState('Lun')
+  const [newStart, setNewStart] = useState('12:00')
+  const [newEnd, setNewEnd] = useState('15:00')
+
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<CourseFormData>({
     resolver: zodResolver(schema),
     defaultValues: course ? {
-      name: course.name, code: course.code, description: course.description ?? '',
-      group: course.group, room: course.room, schedule: course.schedule,
-      startDate: course.startDate, endDate: course.endDate,
-    } : {},
+      name: course.name,
+      room: course.room,
+      schedule: course.schedule,
+    } : {
+      name: '',
+      room: '',
+      schedule: '',
+    },
   })
 
-  const onSubmit = (data: CreateCourseForm) => {
+  // Synchronize blocks to form schedule
+  const syncBlocks = (updatedBlocks: ScheduleBlock[]) => {
+    setScheduleBlocks(updatedBlocks)
+    const formatted = formatBlocksToSchedule(updatedBlocks)
+    setCustomSchedule(formatted)
+    setValue('schedule', formatted, { shouldValidate: true })
+  }
+
+  const handleAddScheduleBlock = () => {
+    if (!newStart || !newEnd) {
+      toast.error('Horas incompletas', 'Indica la hora de inicio y de fin')
+      return
+    }
+
+    const dayObj = WEEK_DAYS.find((d) => d.short === newDay) || WEEK_DAYS[0]
+    const newBlock: ScheduleBlock = {
+      id: `blk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      day: dayObj.full,
+      dayShort: dayObj.short,
+      startTime: newStart,
+      endTime: newEnd,
+    }
+
+    const updated = [...scheduleBlocks, newBlock]
+    syncBlocks(updated)
+    toast.success('Horario agregado', `${dayObj.full} de ${newStart} a ${newEnd}`)
+  }
+
+  const handleRemoveBlock = (id: string) => {
+    const updated = scheduleBlocks.filter((b) => b.id !== id)
+    syncBlocks(updated)
+  }
+
+  const onSubmit = (data: CourseFormData) => {
+    const finalSchedule = customSchedule.trim() || data.schedule.trim()
+    if (!finalSchedule) {
+      toast.error('Horario requerido', 'Agrega al menos un día y horario de clase.')
+      return
+    }
+
+    const coursePayload = {
+      ...data,
+      schedule: finalSchedule,
+    }
+
     if (course) {
-      db.courses.update(course.id, data)
+      db.courses.update(course.id, coursePayload)
       toast.success('Curso actualizado', `"${data.name}" fue actualizado correctamente.`)
     } else {
-      db.courses.create({ ...data, teacherId: 'u1', status: 'active' })
+      const year = new Date().getFullYear()
+      const full: CreateCourseForm = {
+        ...coursePayload,
+        code: data.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() || 'CUR',
+        group: '',
+        description: '',
+        startDate: `${year}-01-01`,
+        endDate: `${year}-12-31`,
+      }
+      db.courses.create({ ...full, teacherId: user?.id || 'u-admin', status: 'active' })
       toast.success('Curso creado', `"${data.name}" fue creado exitosamente.`)
     }
     onClose()
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <Input label="Nombre del curso" required error={errors.name?.message} {...register('name')} />
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="sm:col-span-2">
+          <Input
+            label="Nombre del curso"
+            required
+            error={errors.name?.message}
+            placeholder="Ej: Administración de Bases de Datos"
+            {...register('name')}
+          />
         </div>
-        <Input label="Código" required error={errors.code?.message} {...register('code')} />
-        <Input label="Grupo" required error={errors.group?.message} placeholder="Ej: A-01" {...register('group')} />
-        <Input label="Aula" required error={errors.room?.message} placeholder="Ej: 204" {...register('room')} />
-        <Input label="Horario" required error={errors.schedule?.message} placeholder="Ej: Lun/Mié 8:00-9:30" {...register('schedule')} />
-        <Input label="Fecha de inicio" type="date" required error={errors.startDate?.message} {...register('startDate')} />
-        <Input label="Fecha de fin" type="date" required error={errors.endDate?.message} {...register('endDate')} />
-        <div className="col-span-2">
-          <Textarea label="Descripción" {...register('description')} />
+
+        <div className="sm:col-span-2">
+          <Input
+            label="Aula o Sección"
+            required
+            error={errors.room?.message}
+            placeholder="Ej: 5B, Aula 204, Laboratorio 1"
+            {...register('room')}
+          />
         </div>
       </div>
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" loading={isSubmitting}>{course ? 'Guardar cambios' : 'Crear curso'}</Button>
+
+      {/* Apartado dedicado: Días de la semana y horas (Soporta múltiples turnos el mismo día) */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 space-y-4">
+        <div>
+          <label className="text-sm font-semibold text-[var(--color-foreground)] flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)]"></span>
+            Horario de clases por día de la semana
+          </label>
+          <p className="text-xs text-[var(--color-muted)] mt-0.5">
+            Especifica los días y las horas a las que asistes (ejemplo: Lunes a las 12:00 y luego a las 3:00 / 15:00).
+          </p>
+        </div>
+
+        {/* Creador de turnos */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end bg-[var(--color-card)] p-3 rounded-xl border border-[var(--color-border)] shadow-xs">
+          <div className="sm:col-span-4">
+            <label className="block text-xs font-medium text-[var(--color-muted)] mb-1">
+              Día de la semana
+            </label>
+            <select
+              value={newDay}
+              onChange={(e) => setNewDay(e.target.value)}
+              className="form-select text-xs w-full py-2"
+            >
+              {WEEK_DAYS.map((d) => (
+                <option key={d.short} value={d.short}>
+                  {d.full}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sm:col-span-3">
+            <label className="block text-xs font-medium text-[var(--color-muted)] mb-1">
+              Hora de inicio
+            </label>
+            <input
+              type="time"
+              value={newStart}
+              onChange={(e) => setNewStart(e.target.value)}
+              className="form-input text-xs w-full py-2 px-2"
+            />
+          </div>
+
+          <div className="sm:col-span-3">
+            <label className="block text-xs font-medium text-[var(--color-muted)] mb-1">
+              Hora de fin
+            </label>
+            <input
+              type="time"
+              value={newEnd}
+              onChange={(e) => setNewEnd(e.target.value)}
+              className="form-input text-xs w-full py-2 px-2"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={handleAddScheduleBlock}
+              className="w-full justify-center text-xs py-2"
+            >
+              + Agregar
+            </Button>
+          </div>
+        </div>
+
+        {/* Lista de horarios asignados */}
+        {scheduleBlocks.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-[var(--color-muted)]">
+              Horarios programados para este curso:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {scheduleBlocks.map((b) => (
+                <div
+                  key={b.id}
+                  className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)] shadow-xs text-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-bold text-[var(--color-primary)] px-2 py-0.5 rounded bg-[var(--color-primary-light)]">
+                      {b.day}
+                    </span>
+                    <span className="font-medium text-[var(--color-foreground)]">
+                      {b.startTime} - {b.endTime}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBlock(b.id)}
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 p-1 rounded transition-colors"
+                    title="Eliminar este horario"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="p-3 rounded-lg border border-dashed border-[var(--color-border)] text-center text-xs text-[var(--color-muted)]">
+            Aún no has agregado horarios. Selecciona el día y las horas arriba y pulsa <strong>"+ Agregar"</strong>.
+          </div>
+        )}
+
+        {/* Vista previa / Ajuste manual del resumen de horario */}
+        <div className="pt-1">
+          <Input
+            label="Resumen consolidado del horario"
+            value={customSchedule}
+            onChange={(e) => {
+              setCustomSchedule(e.target.value)
+              setValue('schedule', e.target.value)
+            }}
+            placeholder="Ej: Lun 12:00-13:30, Lun 15:00-16:30, Mié 8:00-10:00"
+            error={errors.schedule?.message}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="ghost" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button type="submit" loading={isSubmitting}>
+          {course ? 'Guardar cambios' : 'Crear curso'}
+        </Button>
       </div>
     </form>
   )
 }
 
 export default function CoursesPage() {
-  const [courses, setCourses] = useState(db.courses.list())
+  const courses = useCourses()
   const [modalOpen, setModalOpen] = useState(false)
   const [editCourse, setEditCourse] = useState<Course | undefined>()
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
-
-  const refresh = () => setCourses([...db.courses.list()])
 
   const handleDelete = () => {
     if (!deleteTarget) return
     db.courses.delete(deleteTarget.id)
     toast.success('Curso eliminado')
     setDeleteTarget(null)
-    refresh()
   }
 
   return (
@@ -200,13 +448,13 @@ export default function CoursesPage() {
 
       <Modal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); refresh() }}
+        onClose={() => setModalOpen(false)}
         title={editCourse ? 'Editar curso' : 'Nuevo curso'}
         maxWidth="lg"
       >
         <CourseForm
           course={editCourse}
-          onClose={() => { setModalOpen(false); refresh() }}
+          onClose={() => setModalOpen(false)}
         />
       </Modal>
 

@@ -5,7 +5,7 @@ import {
   AlertTriangle, ArrowRight, Plus, Star, Zap
 } from 'lucide-react'
 import { StatsCard, Card, Badge, Button, ProgressBar, Avatar } from '@/components/ui'
-import { db, getDashboardStats, getTodayCourses, getAcademicAlerts } from '@/lib/mockData'
+import { db, getDashboardStats, getTodayCourses, getAcademicAlerts, useCourses } from '@/lib/mockData'
 import { useAuthStore, useAppStore } from '@/store'
 import { formatGrade, getInitials } from '@/lib/utils'
 import {
@@ -32,7 +32,7 @@ export default function DashboardPage() {
   const stats = getDashboardStats()
   const todayCourses = getTodayCourses()
   const alerts = getAcademicAlerts().slice(0, 4)
-  const courses = db.courses.list()
+  const courses = useCourses()
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches'

@@ -1,0 +1,851 @@
+{
+  "courses": [
+    {
+      "id": "c-4b",
+      "name": "4to B de Secundaria",
+      "code": "4SEC-B",
+      "group": "B",
+      "room": "4B",
+      "schedule": "Lun a Vie 8:00-1:00",
+      "startDate": "2026-08-01",
+      "endDate": "2026-12-15",
+      "studentCount": 30,
+      "averageGrade": 85,
+      "attendanceRate": 94
+    },
+    {
+      "id": "c-5b",
+      "name": "5to B de Secundaria",
+      "code": "5SEC-B",
+      "group": "B",
+      "room": "5B",
+      "schedule": "Lun a Vie 8:00-1:00",
+      "startDate": "2026-08-01",
+      "endDate": "2026-12-15",
+      "studentCount": 25,
+      "averageGrade": 83.5,
+      "attendanceRate": 92
+    },
+    {
+      "id": "c-6b",
+      "name": "6to B de Secundaria",
+      "code": "6SEC-B",
+      "group": "B",
+      "room": "6B",
+      "schedule": "Lun a Vie 8:00-1:00",
+      "startDate": "2026-08-01",
+      "endDate": "2026-12-15",
+      "studentCount": 25,
+      "averageGrade": 86.2,
+      "attendanceRate": 95
+    }
+  ],
+  "students": {
+    "c-4b": [
+      {
+        "id": "c-4b-s1",
+        "studentId": "1",
+        "firstName": "YANNI",
+        "lastName": "CARVAJAL RAMIREZ",
+        "email": "yanni.carvajal@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s2",
+        "studentId": "2",
+        "firstName": "JIMMY ALEXANDER",
+        "lastName": "CHARLES SANTANA",
+        "email": "jimmy.charles@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s3",
+        "studentId": "3",
+        "firstName": "WANDEL",
+        "lastName": "DE LA ROSA ROSADO",
+        "email": "wandel.de@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s4",
+        "studentId": "4",
+        "firstName": "AXEL JADIEL",
+        "lastName": "DE LOS SANTOS SILVERIO",
+        "email": "axel.de@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s5",
+        "studentId": "5",
+        "firstName": "FRANDY DANIEL",
+        "lastName": "DOMINGUEZ PILAR",
+        "email": "frandy.dominguez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s6",
+        "studentId": "6",
+        "firstName": "NAISHA ISABEL",
+        "lastName": "ESPEJO NOVA",
+        "email": "naisha.espejo@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s7",
+        "studentId": "7",
+        "firstName": "SHANERY",
+        "lastName": "FELIZ MESSON",
+        "email": "shanery.feliz@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s8",
+        "studentId": "8",
+        "firstName": "JAVIER MANUEL",
+        "lastName": "FORTUNATO PRENZA",
+        "email": "javier.fortunato@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s9",
+        "studentId": "9",
+        "firstName": "VERONICA ROSMARIE",
+        "lastName": "GARCIA DIAZ",
+        "email": "veronica.garcia@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s10",
+        "studentId": "10",
+        "firstName": "MOISES RAFAEL",
+        "lastName": "GOMEZ ALEMAN",
+        "email": "moises.gomez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s11",
+        "studentId": "11",
+        "firstName": "ENMANUEL",
+        "lastName": "GUABA PEGUERO",
+        "email": "enmanuel.guaba@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s12",
+        "studentId": "12",
+        "firstName": "ALEJANDRO JOSE",
+        "lastName": "GUERRERO GONZALEZ",
+        "email": "alejandro.guerrero@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s13",
+        "studentId": "13",
+        "firstName": "ROSALIA NICOLE",
+        "lastName": "HENRIQUEZ ALMANZAR",
+        "email": "rosalia.henriquez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s14",
+        "studentId": "14",
+        "firstName": "LESLIE INDEKEL",
+        "lastName": "MALDONADO MARTINEZ",
+        "email": "leslie.maldonado@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s15",
+        "studentId": "15",
+        "firstName": "HENDRY",
+        "lastName": "MARRERO GARCIA",
+        "email": "hendry.marrero@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s16",
+        "studentId": "16",
+        "firstName": "ISABELLA MARIE",
+        "lastName": "MARTE ESPINAL",
+        "email": "isabella.marte@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s17",
+        "studentId": "17",
+        "firstName": "CARLOS HANIEL",
+        "lastName": "MATEO",
+        "email": "carlos.mateo@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s18",
+        "studentId": "18",
+        "firstName": "ESTIBEN YASSER",
+        "lastName": "MEDRANO GONZALEZ",
+        "email": "estiben.medrano@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s19",
+        "studentId": "19",
+        "firstName": "GERALD NAIM",
+        "lastName": "MOSCOSO QUEZADA",
+        "email": "gerald.moscoso@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s20",
+        "studentId": "20",
+        "firstName": "JEAN ALEXANDER",
+        "lastName": "MOSCOSO RODRIGUEZ",
+        "email": "jean.moscoso@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s21",
+        "studentId": "21",
+        "firstName": "CARLOS JOSE",
+        "lastName": "NOVA ACOSTA",
+        "email": "carlos.nova@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s22",
+        "studentId": "22",
+        "firstName": "JUSTIN JESUS",
+        "lastName": "ORTEGA NUÑEZ",
+        "email": "justin.ortega@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s23",
+        "studentId": "23",
+        "firstName": "NICOLE",
+        "lastName": "PAYANO",
+        "email": "nicole.payano@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s24",
+        "studentId": "24",
+        "firstName": "MARIO ELIAS",
+        "lastName": "REYNOSO MORA",
+        "email": "mario.reynoso@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s25",
+        "studentId": "25",
+        "firstName": "GILSEB JESUS",
+        "lastName": "SANTANA MORILLO",
+        "email": "gilseb.santana@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s26",
+        "studentId": "26",
+        "firstName": "EDRIAN",
+        "lastName": "SANTOS POLANCO",
+        "email": "edrian.santos@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s27",
+        "studentId": "27",
+        "firstName": "JULIANNY MARIE",
+        "lastName": "SUSANA HERRERA",
+        "email": "julianny.susana@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s28",
+        "studentId": "28",
+        "firstName": "KENDRIS MANUEL",
+        "lastName": "TAMARES CARDENES",
+        "email": "kendris.tamares@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s29",
+        "studentId": "29",
+        "firstName": "LUIS ARIEL IGNACIO",
+        "lastName": "TEJEDA PEREZ",
+        "email": "luis.tejeda@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-4b-s30",
+        "studentId": "30",
+        "firstName": "CHRIS ANGEL",
+        "lastName": "VARGAS GUTIERREZ",
+        "email": "chris.vargas@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      }
+    ],
+    "c-5b": [
+      {
+        "id": "c-5b-s1",
+        "studentId": "1",
+        "firstName": "GABRIEL JOSE",
+        "lastName": "ABREU GRULLON",
+        "email": "gabriel.abreu@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s2",
+        "studentId": "2",
+        "firstName": "YADIEL ANTONIO",
+        "lastName": "ACOSTA ANTIGUA",
+        "email": "yadiel.acosta@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s3",
+        "studentId": "3",
+        "firstName": "ALIANNA MICHELLE",
+        "lastName": "CARELA BAUTISTA",
+        "email": "alianna.carela@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s4",
+        "studentId": "4",
+        "firstName": "JEREMY RAPHAEL",
+        "lastName": "CASTRO QUEZADA",
+        "email": "jeremy.castro@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s5",
+        "studentId": "5",
+        "firstName": "ABIGAIL",
+        "lastName": "CRUZ SALA",
+        "email": "abigail.cruz@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s6",
+        "studentId": "6",
+        "firstName": "ADRIAN",
+        "lastName": "GARCIA MARTINEZ",
+        "email": "adrian.garcia@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s7",
+        "studentId": "7",
+        "firstName": "STALIN VLADIMIR",
+        "lastName": "GONZALEZ GUZMAN",
+        "email": "stalin.gonzalez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s8",
+        "studentId": "8",
+        "firstName": "ANA MARGARITA",
+        "lastName": "GUZMAN VARGAS",
+        "email": "ana.guzman@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s9",
+        "studentId": "9",
+        "firstName": "DAULIN RAFAEL",
+        "lastName": "HERNANDEZ LOPEZ",
+        "email": "daulin.hernandez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s10",
+        "studentId": "10",
+        "firstName": "DARIEL JOSUE",
+        "lastName": "HERNANDEZ LOPEZ",
+        "email": "dariel.hernandez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s11",
+        "studentId": "11",
+        "firstName": "GRACE AIRAM",
+        "lastName": "MANCEBO",
+        "email": "grace.mancebo@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s12",
+        "studentId": "12",
+        "firstName": "STEVEN GREGORIO",
+        "lastName": "MAURICIO PEÑA",
+        "email": "steven.mauricio@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s13",
+        "studentId": "13",
+        "firstName": "LUSLANDI YRISMER",
+        "lastName": "MEDRANO RUIZ",
+        "email": "luslandi.medrano@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s14",
+        "studentId": "14",
+        "firstName": "YEIMI MARIEL",
+        "lastName": "MENDEZ DE LOS SANTOS",
+        "email": "yeimi.mendez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s15",
+        "studentId": "15",
+        "firstName": "LORANGELIES",
+        "lastName": "MONTAS MENA",
+        "email": "lorangelies.montas@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s16",
+        "studentId": "16",
+        "firstName": "HENRY DANIEL",
+        "lastName": "PAULINO PEREZ",
+        "email": "henry.paulino@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s17",
+        "studentId": "17",
+        "firstName": "MARIOLIS",
+        "lastName": "RODRIGUEZ LANTIGUA",
+        "email": "mariolis.rodriguez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s18",
+        "studentId": "18",
+        "firstName": "ADRIEL MAKEY",
+        "lastName": "RODRIGUEZ SANTOS",
+        "email": "adriel.rodriguez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s19",
+        "studentId": "19",
+        "firstName": "KEVIN AMAURY",
+        "lastName": "ROJAS GARCIA",
+        "email": "kevin.rojas@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s20",
+        "studentId": "20",
+        "firstName": "SANDY ALEXANDER",
+        "lastName": "SANCHEZ PAULINO",
+        "email": "sandy.sanchez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s21",
+        "studentId": "21",
+        "firstName": "BRANDELS JESUS",
+        "lastName": "SANTOS BORDRE",
+        "email": "brandels.santos@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s22",
+        "studentId": "22",
+        "firstName": "ANGELINA",
+        "lastName": "THOMAS FELIZ",
+        "email": "angelina.thomas@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s23",
+        "studentId": "23",
+        "firstName": "YNES GABRIELA",
+        "lastName": "TOLENTINO GUILLEN",
+        "email": "ynes.tolentino@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s24",
+        "studentId": "24",
+        "firstName": "DANNA AZALEA",
+        "lastName": "TORIBIO GONZALEZ",
+        "email": "danna.toribio@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-5b-s25",
+        "studentId": "25",
+        "firstName": "ESMERALDA",
+        "lastName": "VIVIECA CASTILLO",
+        "email": "esmeralda.vivieca@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      }
+    ],
+    "c-6b": [
+      {
+        "id": "c-6b-s1",
+        "studentId": "1",
+        "firstName": "WILKA CAROLINA",
+        "lastName": "ALBUEY RODRIGUEZ",
+        "email": "wilka.albuey@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s2",
+        "studentId": "2",
+        "firstName": "JHON MICHAEL",
+        "lastName": "ALCANTARA MARTINEZ",
+        "email": "jhon.alcantara@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s3",
+        "studentId": "3",
+        "firstName": "ALEXIS JOSHUE",
+        "lastName": "ANTIGUA REINOSO",
+        "email": "alexis.antigua@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s4",
+        "studentId": "4",
+        "firstName": "ROCIO ANGELICA",
+        "lastName": "CABRERA MEJIA",
+        "email": "rocio.cabrera@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s5",
+        "studentId": "5",
+        "firstName": "ISAEL ALEXANDER",
+        "lastName": "CABRERA NOLASCO",
+        "email": "isael.cabrera@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s6",
+        "studentId": "6",
+        "firstName": "MICHAEL OCTAVIO",
+        "lastName": "CANO CASTILLO",
+        "email": "michael.cano@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s7",
+        "studentId": "7",
+        "firstName": "SHAYLA GABRIELA",
+        "lastName": "CEBALLO SANTA",
+        "email": "shayla.ceballo@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s8",
+        "studentId": "8",
+        "firstName": "SEBASTIAN",
+        "lastName": "DE LA ROSA CEPEDA",
+        "email": "sebastian.de@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s9",
+        "studentId": "9",
+        "firstName": "GLISMEYLI",
+        "lastName": "DE LOS SANTOS MENDEZ",
+        "email": "glismeyli.de@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s10",
+        "studentId": "10",
+        "firstName": "EMELY",
+        "lastName": "DOMINGUEZ BAEZ",
+        "email": "emely.dominguez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s11",
+        "studentId": "11",
+        "firstName": "FLOR MARI",
+        "lastName": "ESPINAL POLANCO",
+        "email": "flor.espinal@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s12",
+        "studentId": "12",
+        "firstName": "JANSEL YENEURIS",
+        "lastName": "GERONIMO SOSA",
+        "email": "jansel.geronimo@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s13",
+        "studentId": "13",
+        "firstName": "ALEJANDRO GABRIEL",
+        "lastName": "GOMEZ MEJIA",
+        "email": "alejandro.gomez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s14",
+        "studentId": "14",
+        "firstName": "RUTH ESPERANZA",
+        "lastName": "HENRIQUEZ ALMANZAR",
+        "email": "ruth.henriquez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s15",
+        "studentId": "15",
+        "firstName": "LIZ ESTHER",
+        "lastName": "MARZAN",
+        "email": "liz.marzan@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s16",
+        "studentId": "16",
+        "firstName": "JEAN ONEILL",
+        "lastName": "MEDINA MERCADO",
+        "email": "jean.medina@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s17",
+        "studentId": "17",
+        "firstName": "MARIANGEL",
+        "lastName": "MORETA ENCARNACION",
+        "email": "mariangel.moreta@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s18",
+        "studentId": "18",
+        "firstName": "REIMY",
+        "lastName": "PAULINO ASENCIO",
+        "email": "reimy.paulino@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s19",
+        "studentId": "19",
+        "firstName": "GLORIA ESTHER",
+        "lastName": "REYNOSO DE JESUS",
+        "email": "gloria.reynoso@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s20",
+        "studentId": "20",
+        "firstName": "DENCEL SAUL",
+        "lastName": "ROSARIO PACHECO",
+        "email": "dencel.rosario@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s21",
+        "studentId": "21",
+        "firstName": "GENESIS LISHEILY",
+        "lastName": "RUIZ ALCANTARA",
+        "email": "genesis.ruiz@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s22",
+        "studentId": "22",
+        "firstName": "DAVID",
+        "lastName": "SALCIE MARQUEZ",
+        "email": "david.salcie@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s23",
+        "studentId": "23",
+        "firstName": "JOHN DALEXIS",
+        "lastName": "SANCHEZ PAULINO",
+        "email": "john.sanchez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s24",
+        "studentId": "24",
+        "firstName": "LESLY AMAHIA",
+        "lastName": "VALDEZ SANTANA",
+        "email": "lesly.valdez@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      },
+      {
+        "id": "c-6b-s25",
+        "studentId": "25",
+        "firstName": "RYAN RIALIC",
+        "lastName": "VALERIO GONZALEZ",
+        "email": "ryan.valerio@estudiante.edu",
+        "phone": "",
+        "status": "active",
+        "createdAt": "2026-08-01T00:00:00Z"
+      }
+    ]
+  }
+}

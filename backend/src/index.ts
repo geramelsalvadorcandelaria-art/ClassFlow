@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import path from 'path'
 import { authRouter } from './routes/auth'
 import { coursesRouter } from './routes/courses'
 import { studentsRouter } from './routes/students'
@@ -36,6 +37,19 @@ app.use('/api/attendance', attendanceRouter)
 app.use('/api/evaluations', evaluationsRouter)
 app.use('/api/grades', gradesRouter)
 app.use('/api/reports', reportsRouter)
+
+// ─── Serve Frontend in Production ─────────────────────────────
+const frontendDist = path.join(__dirname, '../../frontend/dist')
+app.use(express.static(frontendDist))
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path === '/health') {
+    return next()
+  }
+  res.sendFile(path.join(frontendDist, 'index.html'), (err) => {
+    if (err) next()
+  })
+})
 
 // ─── Error handlers ────────────────────────────────────────────
 app.use(notFoundHandler)

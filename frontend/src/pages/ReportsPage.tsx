@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { TrendingUp, Users, Award, AlertTriangle, Download, Filter } from 'lucide-react'
-import { Card, StatsCard, Badge, PageHeader, Select, ProgressBar } from '@/components/ui'
-import { db, MOCK_COURSES, getAcademicAlerts, getAllStudents } from '@/lib/mockData'
+import { TrendingUp, Users, Award, AlertTriangle, Download, Filter, FileSpreadsheet, Printer, Check } from 'lucide-react'
+import { Card, StatsCard, Badge, PageHeader, Select, ProgressBar, Modal, Button } from '@/components/ui'
+import { db, MOCK_COURSES, getAcademicAlerts, getAllStudents, useCourses } from '@/lib/mockData'
+import { toast } from '@/store'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis
@@ -12,14 +13,56 @@ const COLORS = ['#16A34A', '#2563EB', '#D97706', '#DC2626']
 
 export default function ReportsPage() {
   const [selectedCourse, setSelectedCourse] = useState('')
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
-  const courses = db.courses.list()
+  const courses = useCourses()
   const alerts = getAcademicAlerts()
   const allStudents = getAllStudents()
 
   const filteredStudents = selectedCourse
     ? allStudents.filter((s) => s.courseId === selectedCourse)
     : allStudents
+
+  // Handle Export to CSV
+  const handleExportCSV = () => {
+    try {
+      const headers = ['Matricula', 'Nombre', 'Apellido', 'Curso', 'Promedio', 'Asistencia', 'Estado', 'En Riesgo']
+      const rows = filteredStudents.map((s) => [
+        s.studentId,
+        `"${s.firstName}"`,
+        `"${s.lastName}"`,
+        `"${s.courseName || ''}"`,
+        `${s.averageGrade.toFixed(1)}%`,
+        `${s.attendanceRate}%`,
+        s.status,
+        s.averageGrade < 70 || s.attendanceRate < 80 ? 'SI' : 'NO'
+      ])
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      const courseName = selectedCourse ? courses.find(c => c.id === selectedCourse)?.code || 'Curso' : 'Todos_los_Cursos'
+      link.href = url
+      link.download = `Reporte_Academico_${courseName}_${new Date().toISOString().split('T')[0]}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+
+      setExportModalOpen(false)
+      toast.success('Reporte exportado', 'El archivo CSV ha sido descargado correctamente')
+    } catch (err) {
+      toast.error('Error al exportar', 'No se pudo generar el archivo de reporte')
+    }
+  }
+
+  // Handle Print / PDF
+  const handlePrintPDF = () => {
+    setExportModalOpen(false)
+    setTimeout(() => {
+      window.print()
+      toast.info('Vista de impresión abierta', 'Puedes guardar como PDF o imprimir el reporte')
+    }, 300)
+  }
 
   // Grade distribution
   const distribution = {
@@ -66,7 +109,11 @@ export default function ReportsPage() {
         title="Reportes"
         subtitle="Análisis académico y estadísticas"
         actions={
-          <button className="btn btn-secondary" aria-label="Exportar reporte">
+          <button
+            onClick={() => setExportModalOpen(true)}
+            className="btn btn-secondary cursor-pointer"
+            aria-label="Exportar reporte"
+          >
             <Download size={15} />
             <span>Exportar</span>
           </button>
@@ -195,6 +242,55 @@ export default function ReportsPage() {
           )}
         </Card>
       </div>
+
+      {/* Modal de Exportación */}
+      <Modal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        title="Exportar Reporte Académico"
+        maxWidth="sm"
+      >
+        <div className="space-y-4 py-2">
+          <p className="text-xs text-[var(--color-muted)]">
+            Selecciona el formato en el que deseas exportar los datos del reporte actual ({filteredStudents.length} estudiantes):
+          </p>
+
+          <div className="space-y-2.5">
+            <button
+              onClick={handleExportCSV}
+              className="w-full p-4 rounded-xl border border-[var(--color-border)] hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-secondary)] flex items-center gap-3.5 transition-all text-left cursor-pointer group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                <FileSpreadsheet size={20} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Descargar Excel / CSV</p>
+                <p className="text-xs text-[var(--color-muted)]">Archivo estructurado compatible con Microsoft Excel, Google Sheets</p>
+              </div>
+            </button>
+
+            <button
+              onClick={handlePrintPDF}
+              className="w-full p-4 rounded-xl border border-[var(--color-border)] hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-secondary)] flex items-center gap-3.5 transition-all text-left cursor-pointer group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                <Printer size={20} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Imprimir o Guardar como PDF</p>
+                <p className="text-xs text-[var(--color-muted)]">Genera una vista optimizada lista para impresión o exportar a PDF</p>
+              </div>
+            </button>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button variant="ghost" onClick={() => setExportModalOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }
+

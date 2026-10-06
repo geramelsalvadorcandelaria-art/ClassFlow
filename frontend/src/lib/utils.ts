@@ -332,8 +332,48 @@ export function formatGrade(score: number, decimals = 1): string {
   return score.toFixed(decimals)
 }
 
+export function toLocalISO(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
+  return toLocalISO(new Date())
+}
+
+export function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return toLocalISO(new Date(y, m - 1, d + days))
+}
+
+export function weekdayOfISO(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).getDay()
+}
+
+/** Extrae los días de clase (0=Dom … 6=Sáb) de un horario como "Lun a Vie 8:00-1:00" o "Lun/Mié 8:00-9:30". */
+export function parseScheduleDays(schedule: string): number[] {
+  const s = (schedule || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  if (!s.trim()) return []
+
+  // Rango Lunes a Viernes (ej. "Lun a Vie", "Lun-Vie", "Lunes a Viernes")
+  if (/lun.*(?:a|-|al).*vie/.test(s)) {
+    return [1, 2, 3, 4, 5]
+  }
+
+  // Rango Lunes a Sábado
+  if (/lun.*(?:a|-|al).*sab/.test(s)) {
+    return [1, 2, 3, 4, 5, 6]
+  }
+
+  // Días individuales
+  const map: Array<[RegExp, number]> = [
+    [/\bdom/, 0], [/\blun/, 1], [/\bmar/, 2], [/\bmie/, 3],
+    [/\bjue/, 4], [/\bvie/, 5], [/\bsab/, 6],
+  ]
+  return map.filter(([re]) => re.test(s)).map(([, n]) => n)
 }
 
 // ─── Student initials ─────────────────────────────────────────

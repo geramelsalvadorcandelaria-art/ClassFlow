@@ -1,12 +1,18 @@
+import { useState, useEffect } from 'react'
 import type {
   Course, Student, Enrollment, AttendanceRecord, Evaluation, Grade,
-  DashboardStats, TodayCourse, AcademicAlert, StudentWithStats, AttendanceStatus
+  DashboardStats, TodayCourse, AcademicAlert, StudentWithStats, AttendanceStatus, User
 } from '@/types'
 import { todayISO } from '@/lib/utils'
+import realStudentsFile from './realStudentsData.json'
+
+export const REAL_COURSES: Course[] = realStudentsFile.courses as Course[]
+export const REAL_STUDENTS_BY_COURSE: Record<string, Student[]> = realStudentsFile.students as Record<string, Student[]>
 
 // ─── Seed data ────────────────────────────────────────────────
 
 export const MOCK_COURSES: Course[] = [
+  ...REAL_COURSES,
   {
     id: 'c1', name: 'Desarrollo Web', code: 'DW-101', group: 'A-01',
     room: '204', schedule: 'Lun/Mié/Vie 8:00-9:30', startDate: '2026-08-01', endDate: '2026-12-15',
@@ -53,6 +59,7 @@ function makeStudents(courseId: string, count: number): Student[] {
 }
 
 export const MOCK_STUDENTS_BY_COURSE: Record<string, Student[]> = {
+  ...REAL_STUDENTS_BY_COURSE,
   c1: makeStudents('c1', 28),
   c2: makeStudents('c2', 24),
   c3: makeStudents('c3', 30),
@@ -152,29 +159,29 @@ export function getDashboardStats(): DashboardStats {
 }
 
 export function getTodayCourses(): TodayCourse[] {
-  return MOCK_COURSES.slice(0, 2).map((c) => ({
+  return db.courses.list().slice(0, 3).map((c) => ({
     courseId: c.id, courseName: c.name, group: c.group,
     schedule: c.schedule, room: c.room,
-    studentCount: c.studentCount ?? 0,
+    studentCount: (db.students.list(c.id) ?? []).length,
     attendanceRate: c.attendanceRate,
     hasAttendanceToday: false,
   }))
 }
 
 export function getStudentWithStats(studentId: string, courseId: string): StudentWithStats | null {
-  const students = MOCK_STUDENTS_BY_COURSE[courseId] ?? []
+  const students = db.students.list(courseId)
   const s = students.find((x) => x.id === studentId)
   if (!s) return null
-  const course = MOCK_COURSES.find((c) => c.id === courseId)
-  const grades = (MOCK_GRADES[courseId] ?? []).filter((g) => g.studentId === studentId)
-  const evals = MOCK_EVALUATIONS[courseId] ?? []
+  const course = db.courses.get(courseId)
+  const grades = db.grades.listByStudent(courseId, studentId)
+  const evals = db.evaluations.list(courseId)
   const avg = grades.length
     ? grades.reduce((sum, g) => {
         const ev = evals.find((e) => e.id === g.evaluationId)
         return ev ? sum + (g.score / ev.maxScore) * 100 : sum
       }, 0) / grades.length
     : 0
-  const att = (MOCK_ATTENDANCE[courseId] ?? []).filter((a) => a.studentId === studentId)
+  const att = db.attendance.list(courseId).filter((a) => a.studentId === studentId)
   const present = att.filter((a) => a.status === 'present' || a.status === 'late').length
   return {
     ...s, courseId, courseName: course?.name, group: course?.group,
@@ -186,12 +193,12 @@ export function getStudentWithStats(studentId: string, courseId: string): Studen
 
 export function getAcademicAlerts(): AcademicAlert[] {
   const alerts: AcademicAlert[] = []
-  MOCK_COURSES.forEach((course) => {
-    const students = MOCK_STUDENTS_BY_COURSE[course.id] ?? []
-    students.slice(0, 3).forEach((s) => {
+  db.courses.list().forEach((course) => {
+    const students = db.students.list(course.id)
+    students.forEach((s) => {
       const sw = getStudentWithStats(s.id, course.id)
       if (!sw) return
-      if (sw.averageGrade < 70) {
+      if (sw.averageGrade > 0 && sw.averageGrade < 70) {
         alerts.push({
           studentId: s.id, studentName: `${s.firstName} ${s.lastName}`,
           courseId: course.id, courseName: course.name,
@@ -199,7 +206,7 @@ export function getAcademicAlerts(): AcademicAlert[] {
           alertType: 'low_grade', severity: sw.averageGrade < 60 ? 'high' : 'medium',
         })
       }
-      if (sw.attendanceRate < 80) {
+      if (sw.attendanceRate > 0 && sw.attendanceRate < 80) {
         alerts.push({
           studentId: s.id, studentName: `${s.firstName} ${s.lastName}`,
           courseId: course.id, courseName: course.name,
@@ -209,135 +216,434 @@ export function getAcademicAlerts(): AcademicAlert[] {
       }
     })
   })
-  return alerts.slice(0, 8)
+  return alerts.slice(0, 10)
 }
 
 export function getAllStudents(): StudentWithStats[] {
-  return MOCK_COURSES.flatMap((course) =>
-    (MOCK_STUDENTS_BY_COURSE[course.id] ?? []).map((s) => {
+  return db.courses.list().flatMap((course) =>
+    db.students.list(course.id).map((s) => {
       const sw = getStudentWithStats(s.id, course.id)
-      return sw ?? { ...s, averageGrade: 0, attendanceRate: 0, evaluationsCount: 0, courseId: course.id, courseName: course.name, group: course.group }
+      return sw ?? {
+        ...s,
+        averageGrade: 0,
+        attendanceRate: 0,
+        evaluationsCount: 0,
+        courseId: course.id,
+        courseName: course.name,
+        group: course.group,
+      }
     })
   )
 }
 
 export function getAttendanceForDate(courseId: string, date: string): AttendanceRecord[] {
-  return (MOCK_ATTENDANCE[courseId] ?? []).filter((a) => a.date === date)
+  return db.attendance.listByDate(courseId, date)
 }
 
-// ─── Mutable in-memory state ──────────────────────────────────
-// (replaces DB writes in the MVP without a backend running)
-const _courses = [...MOCK_COURSES]
-const _students: Record<string, Student[]> = Object.fromEntries(
-  Object.entries(MOCK_STUDENTS_BY_COURSE).map(([k, v]) => [k, [...v]])
-)
-const _attendance: Record<string, AttendanceRecord[]> = Object.fromEntries(
-  Object.entries(MOCK_ATTENDANCE).map(([k, v]) => [k, [...v]])
-)
-const _evaluations: Record<string, Evaluation[]> = Object.fromEntries(
-  Object.entries(MOCK_EVALUATIONS).map(([k, v]) => [k, [...v]])
-)
-const _grades: Record<string, Grade[]> = Object.fromEntries(
-  Object.entries(MOCK_GRADES).map(([k, v]) => [k, [...v]])
-)
+// ─── Mutable persistent state (LocalStorage Database) ────────────────
+export const DEFAULT_USERS: User[] = [
+  {
+    id: 'u-geramel',
+    name: 'Geramel Salvador Candelaria',
+    email: 'geramelsalvadorcandelaria@gmail.com',
+    role: 'admin',
+    password: 'admin',
+    photo: '',
+    department: 'Dirección General',
+    phone: '+1 (555) 019-2831',
+    active: true,
+    createdAt: '2026-01-10T00:00:00Z',
+  },
+  {
+    id: 'u-pedro',
+    name: 'PEDRO',
+    email: 'pjceballos12@gmail.com',
+    role: 'admin',
+    password: 'demo',
+    photo: '',
+    department: 'Dirección General',
+    phone: '+1 (555) 987-6543',
+    active: true,
+    createdAt: '2026-02-01T00:00:00Z',
+  },
+  {
+    id: 'u1',
+    name: 'Prof. García',
+    email: 'profesor@classflow.com',
+    role: 'teacher',
+    password: 'demo',
+    photo: '',
+    department: 'Ciencias y Tecnología',
+    phone: '+1 (555) 234-5678',
+    active: true,
+    createdAt: '2026-02-15T00:00:00Z',
+  },
+  {
+    id: 'u-coord',
+    name: 'Lic. Fernández',
+    email: 'coordinacion@classflow.com',
+    role: 'coordinator',
+    password: 'coord',
+    photo: '',
+    department: 'Coordinación Académica',
+    phone: '+1 (555) 876-5432',
+    active: true,
+    createdAt: '2026-03-01T00:00:00Z',
+  },
+]
+
+interface MasterDB {
+  courses: Course[]
+  students: Record<string, Student[]>
+  attendance: Record<string, AttendanceRecord[]>
+  evaluations: Record<string, Evaluation[]>
+  grades: Record<string, Grade[]>
+  users: User[]
+}
+
+const STORAGE_KEY = 'classflow_master_db_v2'
+
+function initMasterDB(): MasterDB {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && Array.isArray(parsed.courses) && parsed.students) {
+          if (!Array.isArray(parsed.users) || parsed.users.length === 0) {
+            parsed.users = [...DEFAULT_USERS]
+          } else {
+            // Asegurar que tanto Geramel como Pedro existan con sus cuentas separadas
+            for (const du of DEFAULT_USERS) {
+              if (!parsed.users.some((u: User) => u.id === du.id)) {
+                parsed.users.push(du)
+              }
+            }
+          }
+          // Asegurar que los cursos y estudiantes reales del archivo Excel existan
+          let addedReal = false
+          for (const rc of REAL_COURSES) {
+            if (!parsed.courses.some((c: Course) => c.id === rc.id)) {
+              parsed.courses.unshift(rc)
+              parsed.students[rc.id] = [...(REAL_STUDENTS_BY_COURSE[rc.id] || [])]
+              if (!parsed.attendance) parsed.attendance = {}
+              if (!parsed.evaluations) parsed.evaluations = {}
+              if (!parsed.grades) parsed.grades = {}
+              parsed.attendance[rc.id] = []
+              parsed.evaluations[rc.id] = []
+              parsed.grades[rc.id] = []
+              addedReal = true
+            }
+          }
+          if (addedReal) {
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+            } catch {}
+          }
+          return parsed
+        }
+      }
+    } catch (err) {
+      console.error('Error reading ClassFlow database from localStorage:', err)
+    }
+  }
+
+  // Initial Seed
+  const seeded: MasterDB = {
+    courses: [...MOCK_COURSES],
+    students: Object.fromEntries(
+      Object.entries(MOCK_STUDENTS_BY_COURSE).map(([k, v]) => [k, [...v]])
+    ),
+    attendance: Object.fromEntries(
+      Object.entries(MOCK_ATTENDANCE).map(([k, v]) => [k, [...v]])
+    ),
+    evaluations: Object.fromEntries(
+      Object.entries(MOCK_EVALUATIONS).map(([k, v]) => [k, [...v]])
+    ),
+    grades: Object.fromEntries(
+      Object.entries(MOCK_GRADES).map(([k, v]) => [k, [...v]])
+    ),
+    users: [...DEFAULT_USERS],
+  }
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
+    } catch {}
+  }
+
+  return seeded
+}
+
+const _dbState: MasterDB = initMasterDB()
+
+let _syncTimeout: any = null
+
+function getSyncUrl(): string {
+  const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+  return base ? `${base}/api/sync` : '/api/sync'
+}
+
+function pushToServer() {
+  if (typeof window === 'undefined') return
+  if (_syncTimeout) clearTimeout(_syncTimeout)
+  _syncTimeout = setTimeout(async () => {
+    try {
+      await fetch(getSyncUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(_dbState),
+      })
+    } catch (e) {
+      // Quiet fail if server is offline or local dev
+    }
+  }, 300)
+}
+
+let _usersSyncListener: ((users: User[]) => void) | null = null
+
+export function onUsersSync(callback: (users: User[]) => void) {
+  _usersSyncListener = callback
+}
+
+// ─── Reactividad global para cursos (Sincroniza la barra de cursos al instante) ───
+const _coursesListeners = new Set<() => void>()
+
+export function onCoursesChange(listener: () => void) {
+  _coursesListeners.add(listener)
+  return () => {
+    _coursesListeners.delete(listener)
+  }
+}
+
+export function notifyCoursesChanged() {
+  _coursesListeners.forEach((fn) => {
+    try {
+      fn()
+    } catch (err) {
+      console.error('Error in courses listener:', err)
+    }
+  })
+}
+
+/** Hook reactivo para obtener los cursos actualizados al instante en cualquier componente */
+export function useCourses(): Course[] {
+  const [courses, setCourses] = useState<Course[]>(() => _dbState.courses || [])
+
+  useEffect(() => {
+    setCourses([..._dbState.courses])
+    const unsubscribe = onCoursesChange(() => {
+      setCourses([..._dbState.courses])
+    })
+    return unsubscribe
+  }, [])
+
+  return courses
+}
+
+export async function pullFromServer() {
+  if (typeof window === 'undefined') return
+  try {
+    const res = await fetch(getSyncUrl())
+    if (res.ok) {
+      const json = await res.json()
+      if (json.success && json.data) {
+        if (Array.isArray(json.data.courses)) {
+          _dbState.courses = json.data.courses
+          notifyCoursesChanged()
+        }
+        if (json.data.students) _dbState.students = json.data.students
+        if (json.data.attendance) _dbState.attendance = json.data.attendance
+        if (json.data.evaluations) _dbState.evaluations = json.data.evaluations
+        if (json.data.grades) _dbState.grades = json.data.grades
+        if (Array.isArray(json.data.users) && json.data.users.length > 0) {
+          _dbState.users = json.data.users
+          if (_usersSyncListener) {
+            _usersSyncListener(json.data.users)
+          }
+        }
+        persistDB(false)
+      }
+    }
+  } catch (e) {
+    // Offline or local
+  }
+}
+
+if (typeof window !== 'undefined') {
+  pullFromServer()
+}
+
+function persistDB(shouldPush = true) {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(_dbState))
+    } catch (err) {
+      console.error('Failed to save ClassFlow DB to localStorage:', err)
+    }
+  }
+  if (shouldPush) {
+    pushToServer()
+  }
+}
 
 export const db = {
   courses: {
-    list: () => _courses,
-    get: (id: string) => _courses.find((c) => c.id === id) ?? null,
+    list: () => _dbState.courses,
+    get: (id: string) => _dbState.courses.find((c) => c.id === id) ?? null,
     create: (data: Omit<Course, 'id'>) => {
       const c: Course = { ...data, id: `c${Date.now()}`, studentCount: 0, averageGrade: 0, attendanceRate: 0 }
-      _courses.push(c)
-      _students[c.id] = []
-      _evaluations[c.id] = []
-      _grades[c.id] = []
-      _attendance[c.id] = []
+      _dbState.courses.push(c)
+      _dbState.students[c.id] = []
+      _dbState.evaluations[c.id] = []
+      _dbState.grades[c.id] = []
+      _dbState.attendance[c.id] = []
+      persistDB()
+      notifyCoursesChanged()
       return c
     },
     update: (id: string, data: Partial<Course>) => {
-      const i = _courses.findIndex((c) => c.id === id)
+      const i = _dbState.courses.findIndex((c) => c.id === id)
       if (i === -1) return null
-      _courses[i] = { ..._courses[i], ...data }
-      return _courses[i]
+      _dbState.courses[i] = { ..._dbState.courses[i], ...data }
+      persistDB()
+      notifyCoursesChanged()
+      return _dbState.courses[i]
     },
     delete: (id: string) => {
-      const i = _courses.findIndex((c) => c.id === id)
+      const i = _dbState.courses.findIndex((c) => c.id === id)
       if (i === -1) return false
-      _courses.splice(i, 1)
+      _dbState.courses.splice(i, 1)
+      delete _dbState.students[id]
+      delete _dbState.evaluations[id]
+      delete _dbState.grades[id]
+      delete _dbState.attendance[id]
+      persistDB()
+      notifyCoursesChanged()
       return true
     },
   },
   students: {
-    list: (courseId: string) => _students[courseId] ?? [],
-    get: (courseId: string, studentId: string) => (_students[courseId] ?? []).find((s) => s.id === studentId) ?? null,
+    list: (courseId: string) => _dbState.students[courseId] ?? [],
+    get: (courseId: string, studentId: string) => (_dbState.students[courseId] ?? []).find((s) => s.id === studentId) ?? null,
     create: (courseId: string, data: Omit<Student, 'id' | 'createdAt'>) => {
-      const s: Student = { ...data, id: `s${Date.now()}`, createdAt: new Date().toISOString() }
-      if (!_students[courseId]) _students[courseId] = []
-      _students[courseId].push(s)
-      const ci = _courses.findIndex((c) => c.id === courseId)
-      if (ci !== -1) _courses[ci].studentCount = (_courses[ci].studentCount ?? 0) + 1
+      const s: Student = { ...data, id: `s${Date.now()}_${Math.random().toString(36).substring(2, 6)}`, createdAt: new Date().toISOString() }
+      if (!_dbState.students[courseId]) _dbState.students[courseId] = []
+      _dbState.students[courseId].push(s)
+      const ci = _dbState.courses.findIndex((c) => c.id === courseId)
+      if (ci !== -1) _dbState.courses[ci].studentCount = (_dbState.students[courseId]?.length ?? 1)
+      persistDB()
       return s
     },
+    batchCreate: (courseId: string, studentsData: Array<Omit<Student, 'id' | 'createdAt'>>) => {
+      if (!_dbState.students[courseId]) _dbState.students[courseId] = []
+      const createdList: Student[] = studentsData.map((data, index) => ({
+        ...data,
+        id: `s${Date.now()}_${index}_${Math.random().toString(36).substring(2, 6)}`,
+        createdAt: new Date().toISOString(),
+      }))
+      _dbState.students[courseId].push(...createdList)
+      const ci = _dbState.courses.findIndex((c) => c.id === courseId)
+      if (ci !== -1) _dbState.courses[ci].studentCount = _dbState.students[courseId].length
+      persistDB()
+      return createdList
+    },
     update: (courseId: string, studentId: string, data: Partial<Student>) => {
-      const arr = _students[courseId] ?? []
+      const arr = _dbState.students[courseId] ?? []
       const i = arr.findIndex((s) => s.id === studentId)
       if (i === -1) return null
       arr[i] = { ...arr[i], ...data }
+      persistDB()
       return arr[i]
     },
     delete: (courseId: string, studentId: string) => {
-      const arr = _students[courseId] ?? []
+      const arr = _dbState.students[courseId] ?? []
       const i = arr.findIndex((s) => s.id === studentId)
       if (i === -1) return false
       arr.splice(i, 1)
-      const ci = _courses.findIndex((c) => c.id === courseId)
-      if (ci !== -1) _courses[ci].studentCount = Math.max(0, (_courses[ci].studentCount ?? 1) - 1)
+      const ci = _dbState.courses.findIndex((c) => c.id === courseId)
+      if (ci !== -1) _dbState.courses[ci].studentCount = arr.length
+      persistDB()
       return true
     },
   },
   attendance: {
-    list: (courseId: string) => _attendance[courseId] ?? [],
-    listByDate: (courseId: string, date: string) => (_attendance[courseId] ?? []).filter((a) => a.date === date),
+    list: (courseId: string) => _dbState.attendance[courseId] ?? [],
+    listByDate: (courseId: string, date: string) => (_dbState.attendance[courseId] ?? []).filter((a) => a.date === date),
     save: (courseId: string, records: AttendanceRecord[]) => {
-      const arr = _attendance[courseId] ?? []
+      const arr = _dbState.attendance[courseId] ?? []
       const date = records[0]?.date ?? todayISO()
       const without = arr.filter((a) => a.date !== date)
-      _attendance[courseId] = [...without, ...records]
+      _dbState.attendance[courseId] = [...without, ...records]
+      persistDB()
       return records
+    },
+    deleteByDate: (courseId: string, date: string) => {
+      const arr = _dbState.attendance[courseId] ?? []
+      _dbState.attendance[courseId] = arr.filter((a) => a.date !== date)
+      persistDB()
+      return true
     },
   },
   evaluations: {
-    list: (courseId: string) => _evaluations[courseId] ?? [],
-    get: (courseId: string, evalId: string) => (_evaluations[courseId] ?? []).find((e) => e.id === evalId) ?? null,
+    list: (courseId: string) => _dbState.evaluations[courseId] ?? [],
+    get: (courseId: string, evalId: string) => (_dbState.evaluations[courseId] ?? []).find((e) => e.id === evalId) ?? null,
     create: (data: Omit<Evaluation, 'id'>) => {
-      const e: Evaluation = { ...data, id: `ev${Date.now()}`, period: data.period || 'P1' }
-      if (!_evaluations[e.courseId]) _evaluations[e.courseId] = []
-      _evaluations[e.courseId].push(e)
+      const e: Evaluation = { ...data, id: `ev${Date.now()}_${Math.random().toString(36).substring(2, 6)}`, period: data.period || 'P1' }
+      if (!_dbState.evaluations[e.courseId]) _dbState.evaluations[e.courseId] = []
+      _dbState.evaluations[e.courseId].push(e)
+      persistDB()
       return e
     },
     delete: (courseId: string, evalId: string) => {
-      const arr = _evaluations[courseId] ?? []
+      const arr = _dbState.evaluations[courseId] ?? []
       const i = arr.findIndex((e) => e.id === evalId)
       if (i === -1) return false
       arr.splice(i, 1)
+      persistDB()
       return true
     },
   },
   grades: {
-    list: (courseId: string) => _grades[courseId] ?? [],
-    listByEval: (courseId: string, evalId: string) => (_grades[courseId] ?? []).filter((g) => g.evaluationId === evalId),
-    listByStudent: (courseId: string, studentId: string) => (_grades[courseId] ?? []).filter((g) => g.studentId === studentId),
+    list: (courseId: string) => _dbState.grades[courseId] ?? [],
+    listByEval: (courseId: string, evalId: string) => (_dbState.grades[courseId] ?? []).filter((g) => g.evaluationId === evalId),
+    listByStudent: (courseId: string, studentId: string) => (_dbState.grades[courseId] ?? []).filter((g) => g.studentId === studentId),
     upsert: (courseId: string, grade: Omit<Grade, 'id'>) => {
-      const arr = _grades[courseId] ?? []
+      const arr = _dbState.grades[courseId] ?? []
       const i = arr.findIndex((g) => g.studentId === grade.studentId && g.evaluationId === grade.evaluationId)
-      const entry: Grade = { ...grade, id: `gr${Date.now()}${Math.random()}` }
-      if (i !== -1) { arr[i] = { ...arr[i], ...grade }; return arr[i] }
+      const entry: Grade = { ...grade, id: `gr${Date.now()}_${Math.random().toString(36).substring(2, 6)}` }
+      if (i !== -1) {
+        arr[i] = { ...arr[i], ...grade }
+        persistDB()
+        return arr[i]
+      }
       arr.push(entry)
-      _grades[courseId] = arr
+      _dbState.grades[courseId] = arr
+      persistDB()
       return entry
     },
     batchUpsert: (courseId: string, grades: Array<Omit<Grade, 'id'>>) => {
-      return grades.map((g) => db.grades.upsert(courseId, g))
+      const results = grades.map((g) => {
+        const arr = _dbState.grades[courseId] ?? []
+        const i = arr.findIndex((item) => item.studentId === g.studentId && item.evaluationId === g.evaluationId)
+        if (i !== -1) {
+          arr[i] = { ...arr[i], ...g }
+          return arr[i]
+        }
+        const entry: Grade = { ...g, id: `gr${Date.now()}_${Math.random().toString(36).substring(2, 6)}` }
+        arr.push(entry)
+        _dbState.grades[courseId] = arr
+        return entry
+      })
+      persistDB()
+      return results
+    },
+  },
+  users: {
+    list: () => _dbState.users || [...DEFAULT_USERS],
+    sync: (users: User[]) => {
+      _dbState.users = users
+      persistDB()
     },
   },
 }

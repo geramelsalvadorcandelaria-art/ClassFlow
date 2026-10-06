@@ -1,44 +1,59 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { GraduationCap, BookOpen, Users, ClipboardCheck, BarChart3 } from 'lucide-react'
-import { useAuthStore } from '@/store'
+import { GraduationCap, BookOpen, Users, ClipboardCheck, BarChart3, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react'
+import { useAuthStore, toast } from '@/store'
 import { Button, Input } from '@/components/ui'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import type { LoginForm } from '@/types'
+import { pullFromServer } from '@/lib/mockData'
 
 const schema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(1, 'Contraseña requerida'),
 })
 
-const DEMO_USER = {
-  id: 'u1',
-  name: 'Prof. García',
-  email: 'profesor@classflow.com',
-  role: 'teacher' as const,
-  createdAt: new Date().toISOString(),
-}
-
 export default function LoginPage() {
   const { login } = useAuthStore()
   const navigate = useNavigate()
-  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<LoginForm>({
+  const [showPassword, setShowPassword] = useState(false)
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(schema),
   })
 
-  const onSubmit = (_data: LoginForm) => {
-    // Mock auth: accept any credentials
-    setTimeout(() => {
-      login(DEMO_USER, 'mock-jwt-token')
-      navigate('/', { replace: true })
-    }, 700)
-  }
+  // Sincronizar automáticamente usuarios y estado central al abrir la pantalla de login
+  useEffect(() => {
+    pullFromServer()
+  }, [])
 
-  const fillDemo = () => {
-    setValue('email', 'profesor@classflow.com')
-    setValue('password', 'demo1234')
+  const onSubmit = async (data: LoginForm) => {
+    // Intentar sincronizar antes de validar para asegurar que usuarios creados en otros dispositivos se reconozcan
+    try {
+      await pullFromServer()
+    } catch {
+      // Continuar con usuarios locales si no hay conexión
+    }
+
+    const currentUsers = useAuthStore.getState().users
+    const inputEmail = data.email.trim().toLowerCase()
+    const targetUser = currentUsers.find(
+      (u) => u.email.trim().toLowerCase() === inputEmail
+    )
+
+    if (!targetUser || (targetUser.password && targetUser.password !== data.password)) {
+      toast.error('Acceso denegado', 'El correo electrónico o la contraseña ingresada son incorrectos.')
+      return
+    }
+
+    if (targetUser.active === false) {
+      toast.error('Cuenta inactiva', 'Tu cuenta se encuentra deshabilitada. Contacta al administrador.')
+      return
+    }
+
+    login(targetUser, `jwt-${targetUser.id}-${Date.now()}`)
+    toast.success('Sesión iniciada', `Bienvenido(a), ${targetUser.name}`)
+    navigate('/', { replace: true })
   }
 
   const FEATURES = [
@@ -87,7 +102,13 @@ export default function LoginPage() {
             ))}
           </div>
         </div>
-        <p className="relative z-10 text-blue-300 text-xs">© 2026 ClassFlow. Todos los derechos reservados.</p>
+        <div className="relative z-10 flex items-center justify-between text-blue-300 text-xs">
+          <p>© 2026 ClassFlow. Todos los derechos reservados.</p>
+          <div className="flex items-center gap-1.5 opacity-80">
+            <ShieldCheck size={14} />
+            <span>Autenticación Segura</span>
+          </div>
+        </div>
       </div>
 
       {/* Right panel */}
@@ -105,48 +126,55 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl font-bold mb-1" style={{ fontFamily: 'var(--font-heading)' }}>Bienvenido</h2>
-          <p className="text-sm text-[var(--color-muted)] mb-6">Ingresa a tu cuenta para continuar.</p>
+          <p className="text-sm text-[var(--color-muted)] mb-6">Ingresa tus credenciales para continuar.</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Input
               label="Correo electrónico"
               type="email"
               required
+              autoComplete="email"
               error={errors.email?.message}
-              placeholder="profesor@classflow.com"
+              placeholder="tu-correo@ejemplo.com"
               {...register('email')}
             />
             <Input
               label="Contraseña"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
+              autoComplete="current-password"
               error={errors.password?.message}
-              placeholder="Tu contraseña"
+              placeholder="Tu contraseña secreta"
+              rightIcon={
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors focus:outline-none p-1 cursor-pointer"
+                  title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              }
               {...register('password')}
             />
-            <Button type="submit" size="xl" className="w-full" loading={isSubmitting}>
+            <Button type="submit" size="xl" className="w-full cursor-pointer" loading={isSubmitting}>
               Iniciar sesión
             </Button>
           </form>
 
-          <div className="my-4 flex items-center gap-3">
-            <div className="divider flex-1 my-0" />
-            <span className="text-xs text-[var(--color-muted)]">o</span>
-            <div className="divider flex-1 my-0" />
+          <div className="mt-8 pt-4 border-t border-[var(--color-border)] flex flex-col items-center gap-2 text-center">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--color-muted)]">
+              <Lock size={12} className="text-emerald-500" />
+              <span>Acceso restringido y protegido para personal autorizado</span>
+            </div>
+            <p className="text-xs text-[var(--color-muted)]">
+              ¿Olvidaste tu contraseña o requieres una cuenta?{' '}
+              <span className="text-[var(--color-primary)] font-medium cursor-pointer hover:underline">
+                Contactar a soporte
+              </span>
+            </p>
           </div>
-
-          <button
-            type="button"
-            onClick={fillDemo}
-            className="btn btn-secondary btn-xl w-full"
-          >
-            Usar cuenta de demostración
-          </button>
-
-          <p className="text-center text-xs text-[var(--color-muted)] mt-6">
-            ¿No tienes cuenta?{' '}
-            <span className="text-[var(--color-primary)] font-medium cursor-pointer">Solicitar acceso</span>
-          </p>
         </div>
       </div>
     </div>

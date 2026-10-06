@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Save, Plus, Trash2, Calendar, Table as TableIcon,
-  CheckSquare, BarChart3, PlusCircle, Layers, X
+  CheckSquare, BarChart3, PlusCircle, Layers, X, Filter
 } from 'lucide-react'
-import { Button, Select, Card, Badge, PageHeader, EmptyState, Modal, Input, Textarea } from '@/components/ui'
-import { db, MOCK_COURSES } from '@/lib/mockData'
+import { Button, Select, Card, Badge, PageHeader, EmptyState, Modal, Input, Textarea, ConfirmDialog } from '@/components/ui'
+import { db, useCourses } from '@/lib/mockData'
 import { useAppStore } from '@/store'
 import { toast } from '@/store'
 import {
@@ -210,7 +210,10 @@ function NewEvaluationForm({
 
 export default function GradesPage() {
   const { selectedCourseId, setSelectedCourse } = useAppStore()
-  const [courseId, setCourseId] = useState(selectedCourseId ?? MOCK_COURSES[0]?.id ?? '')
+  const courses = useCourses()
+  const [courseId, setCourseId] = useState(
+    courses.find((c) => c.id === selectedCourseId)?.id ?? courses[0]?.id ?? ''
+  )
   const [periods, setPeriods] = useState<AcademicPeriodInfo[]>([...ACADEMIC_PERIODS])
   const [selectedPeriod, setSelectedPeriod] = useState<string>('P1')
   const [viewMode, setViewMode] = useState<'matrix' | 'by_eval' | 'summary'>('matrix')
@@ -221,8 +224,19 @@ export default function GradesPage() {
   const [newPeriodName, setNewPeriodName] = useState('')
   const [newPeriodShort, setNewPeriodShort] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [evalToDelete, setEvalToDelete] = useState<Evaluation | null>(null)
+  const [sectionFilter, setSectionFilter] = useState<'all' | 'exam' | 'task' | 'participation' | 'attitude' | 'summary'>('all')
 
-  const course = MOCK_COURSES.find((c) => c.id === courseId)
+  // Sincronizar automáticamente el curso seleccionado
+  useEffect(() => {
+    if (selectedCourseId && courses.some((c) => c.id === selectedCourseId)) {
+      setCourseId(selectedCourseId)
+    } else if (courses.length > 0 && !courses.some((c) => c.id === courseId)) {
+      setCourseId(courses[0].id)
+    }
+  }, [selectedCourseId, courses, courseId])
+
+  const course = courses.find((c) => c.id === courseId) ?? db.courses.get(courseId)
   const students = useMemo(() => db.students.list(courseId).filter((s) => s.status === 'active'), [courseId, refreshKey])
   const allEvaluations = useMemo(() => db.evaluations.list(courseId), [courseId, refreshKey])
 
@@ -251,12 +265,16 @@ export default function GradesPage() {
   }, [courseId])
 
   const handleDeleteEval = (e: Evaluation) => {
-    if (confirm(`¿Eliminar la evaluación "${e.name}"? Los pesos de su categoría en ${selectedPeriod} se reajustarán automáticamente.`)) {
-      db.evaluations.delete(courseId, e.id)
-      setEvalId('')
-      setRefreshKey((k) => k + 1)
-      toast.success('Evaluación eliminada', 'Pesos recalculados automáticamente')
-    }
+    setEvalToDelete(e)
+  }
+
+  const confirmDeleteEval = () => {
+    if (!evalToDelete) return
+    db.evaluations.delete(courseId, evalToDelete.id)
+    setEvalId('')
+    setRefreshKey((k) => k + 1)
+    toast.success('Evaluación eliminada')
+    setEvalToDelete(null)
   }
 
   // Open modal pre-filling category
@@ -314,7 +332,10 @@ export default function GradesPage() {
                 setSelectedCourse(e.target.value)
                 setEvalId('')
               }}
-              options={MOCK_COURSES.map((c) => ({ value: c.id, label: `${c.name} (${c.group})` }))}
+              options={courses.map((c) => ({
+                value: c.id,
+                label: `${c.name}${c.room ? ` (Aula ${c.room})` : (c.group ? ` (${c.group})` : '')}`,
+              }))}
             />
           </div>
 
@@ -593,16 +614,133 @@ export default function GradesPage() {
       {/* VIEW MODE 1: MATRIX SPREADSHEET (Full Activities Breakdown) */}
       {viewMode === 'matrix' && (
         <Card padding="none" className="mb-4 shadow-sm overflow-hidden">
-          <div className="p-4 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] flex flex-wrap items-center justify-between gap-3">
+          {/* Section Search & Filter Menu Header */}
+          <div className="p-4 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm">Sábana Completa de Actividades • {selectedPeriod}</h3>
-                <span className="badge badge-primary">{periodEvaluations.length} actividades en este período</span>
+                <h3 className="font-bold text-sm">Planilla de Calificaciones • {selectedPeriod}</h3>
+                <span className="badge badge-primary">{periodEvaluations.length} actividades</span>
               </div>
               <p className="text-xs text-[var(--color-muted)] mt-0.5">
-                Ingresa las notas directamente en cada casilla. Cada categoría se reparte automáticamente: Exámenes (40%), Tareas (30%), Part. (15%), Actitud (15%).
+                Usa el menú de secciones para calificar y verificar directamente sin necesidad de usar la barra de desplazamiento lateral.
               </p>
             </div>
+
+            {/* Menu Dropdown: Buscar por sección */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-[var(--color-foreground)] flex items-center gap-1.5 whitespace-nowrap">
+                <Filter size={14} className="text-[var(--color-primary)]" />
+                <span>Menú por sección:</span>
+              </label>
+              <select
+                className="form-select text-xs py-1.5 px-3 rounded-lg font-medium border-[var(--color-border)] shadow-xs bg-[var(--color-card)] cursor-pointer"
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value as typeof sectionFilter)}
+                aria-label="Buscar o filtrar por sección"
+              >
+                <option value="all">🔍 Todas las secciones (Sábana completa)</option>
+                <option value="exam">📝 Sección: Exámenes (40% • {examsList.length} col)</option>
+                <option value="task">📚 Sección: Tareas (30% • {tasksList.length} col)</option>
+                <option value="participation">🙋 Sección: Participación (15% • {partsList.length} col)</option>
+                <option value="attitude">⭐ Sección: Actitudes y Valores (15% • {attsList.length} col)</option>
+                <option value="summary">📊 Sección: Resumen y Nota Final (Subtotales)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Section Pills / Tabs */}
+          <div className="px-4 py-2.5 bg-[var(--color-card)] border-b border-[var(--color-border)] flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-[var(--color-muted)] mr-1">Secciones:</span>
+            <button
+              type="button"
+              onClick={() => setSectionFilter('all')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1',
+                sectionFilter === 'all'
+                  ? 'bg-[var(--color-primary)] text-white shadow-xs font-semibold'
+                  : 'bg-[var(--color-bg-secondary)] text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+              )}
+            >
+              <span>Todas</span>
+              <span className="text-[10px] opacity-75">({periodEvaluations.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSectionFilter('exam')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
+                sectionFilter === 'exam'
+                  ? 'bg-red-600 text-white shadow-xs font-semibold'
+                  : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200/50'
+              )}
+            >
+              <span>📝 Exámenes (40%)</span>
+              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'exam' ? 'bg-white/20' : 'bg-red-200/60')}>
+                {examsList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSectionFilter('task')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
+                sectionFilter === 'task'
+                  ? 'bg-green-600 text-white shadow-xs font-semibold'
+                  : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200/50'
+              )}
+            >
+              <span>📚 Tareas (30%)</span>
+              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'task' ? 'bg-white/20' : 'bg-green-200/60')}>
+                {tasksList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSectionFilter('participation')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
+                sectionFilter === 'participation'
+                  ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/50'
+              )}
+            >
+              <span>🙋 Participación (15%)</span>
+              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'participation' ? 'bg-white/20' : 'bg-blue-200/60')}>
+                {partsList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSectionFilter('attitude')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
+                sectionFilter === 'attitude'
+                  ? 'bg-amber-600 text-white shadow-xs font-semibold'
+                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/50'
+              )}
+            >
+              <span>⭐ Actitudes (15%)</span>
+              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'attitude' ? 'bg-white/20' : 'bg-amber-200/60')}>
+                {attsList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSectionFilter('summary')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1 sm:ml-auto',
+                sectionFilter === 'summary'
+                  ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/50'
+              )}
+            >
+              <span>📊 Resumen / Totales</span>
+            </button>
           </div>
 
           {periodEvaluations.length === 0 ? (
@@ -621,199 +759,233 @@ export default function GradesPage() {
             </div>
           ) : (
             <div className="table-wrapper overflow-x-auto">
-              <table className="table table-bordered text-xs">
+              <table className="table table-bordered text-xs w-full">
                 <thead>
-                  {/* Tier 1 Header: Category Groups */}
-                  <tr className="bg-[var(--color-bg-secondary)] text-center font-bold">
-                    <th colSpan={2} className="text-left bg-[var(--color-card)]">Estudiante</th>
+                  {/* VIEW: RESUMEN / TOTALES (No horizontal scrolling!) */}
+                  {sectionFilter === 'summary' ? (
+                    <>
+                      <tr className="bg-[var(--color-bg-secondary)] text-center font-bold">
+                        <th colSpan={2} className="text-left bg-[var(--color-card)] sticky left-0 z-20">Estudiante</th>
+                        <th colSpan={4} className="bg-indigo-50 text-indigo-900 border-x border-indigo-200 py-1.5">
+                          Desglose por Secciones de Evaluación ({selectedPeriod})
+                        </th>
+                        <th colSpan={2} className="bg-blue-600 text-white py-1.5">
+                          Calificación Definitiva {selectedPeriod}
+                        </th>
+                      </tr>
+                      <tr className="bg-[var(--color-card)] text-center text-[11px]">
+                        <th className="text-left min-w-[170px] sticky left-0 z-20 bg-[var(--color-card)]">Nombre</th>
+                        <th className="hidden sm:table-cell text-left min-w-[90px] text-[var(--color-muted)]">Matrícula</th>
+                        <th className="bg-red-50 text-red-800 font-bold min-w-[100px]">📝 Exámenes (40 pts)</th>
+                        <th className="bg-green-50 text-green-800 font-bold min-w-[100px]">📚 Tareas (30 pts)</th>
+                        <th className="bg-blue-50 text-blue-800 font-bold min-w-[100px]">🙋 Part. (15 pts)</th>
+                        <th className="bg-amber-50 text-amber-800 font-bold min-w-[100px]">⭐ Actitud (15 pts)</th>
+                        <th className="bg-blue-100 font-black text-blue-900 min-w-[110px]">TOTAL {selectedPeriod} (100)</th>
+                        <th className="min-w-[90px]">Nivel</th>
+                      </tr>
+                    </>
+                  ) : (
+                    <>
+                      {/* Tier 1 Header: Category Groups */}
+                      <tr className="bg-[var(--color-bg-secondary)] text-center font-bold">
+                        <th colSpan={2} className="text-left bg-[var(--color-card)] sticky left-0 z-20">Estudiante</th>
 
-                    {/* Exams Group */}
-                    {examsList.length > 0 && (
-                      <th
-                        colSpan={examsList.length + 1}
-                        className="bg-red-50 text-red-800 border-x border-red-200 py-1.5"
-                      >
-                        <div className="flex items-center justify-between px-2">
-                          <span>EXÁMENES (40% Total • {(40 / examsList.length).toFixed(1)}% c/u)</span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAdd('exam')}
-                            className="text-[11px] px-2 py-0.5 rounded bg-red-600 text-white font-semibold hover:bg-red-700 transition cursor-pointer"
+                        {/* Exams Group */}
+                        {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.length > 0 && (
+                          <th
+                            colSpan={examsList.length + 1}
+                            className="bg-red-50 text-red-800 border-x border-red-200 py-1.5"
                           >
-                            + Examen
-                          </button>
-                        </div>
-                      </th>
-                    )}
+                            <div className="flex items-center justify-between px-2">
+                              <span>EXÁMENES (40% Total • {(40 / examsList.length).toFixed(1)}% c/u)</span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAdd('exam')}
+                                className="text-[11px] px-2 py-0.5 rounded bg-red-600 text-white font-semibold hover:bg-red-700 transition cursor-pointer"
+                              >
+                                + Examen
+                              </button>
+                            </div>
+                          </th>
+                        )}
 
-                    {/* Tasks Group */}
-                    {tasksList.length > 0 && (
-                      <th
-                        colSpan={tasksList.length + 1}
-                        className="bg-green-50 text-green-800 border-x border-green-200 py-1.5"
-                      >
-                        <div className="flex items-center justify-between px-2">
-                          <span>TAREAS (30% Total • {(30 / tasksList.length).toFixed(1)}% c/u)</span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAdd('task')}
-                            className="text-[11px] px-2 py-0.5 rounded bg-green-600 text-white font-semibold hover:bg-green-700 transition cursor-pointer"
+                        {/* Tasks Group */}
+                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.length > 0 && (
+                          <th
+                            colSpan={tasksList.length + 1}
+                            className="bg-green-50 text-green-800 border-x border-green-200 py-1.5"
                           >
-                            + Tarea
-                          </button>
-                        </div>
-                      </th>
-                    )}
+                            <div className="flex items-center justify-between px-2">
+                              <span>TAREAS (30% Total • {(30 / tasksList.length).toFixed(1)}% c/u)</span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAdd('task')}
+                                className="text-[11px] px-2 py-0.5 rounded bg-green-600 text-white font-semibold hover:bg-green-700 transition cursor-pointer"
+                              >
+                                + Tarea
+                              </button>
+                            </div>
+                          </th>
+                        )}
 
-                    {/* Participation Group */}
-                    {partsList.length > 0 && (
-                      <th
-                        colSpan={partsList.length + 1}
-                        className="bg-blue-50 text-blue-800 border-x border-blue-200 py-1.5"
-                      >
-                        <div className="flex items-center justify-between px-2">
-                          <span>PARTICIPACIÓN (15% Total • {(15 / partsList.length).toFixed(1)}% c/u)</span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAdd('participation')}
-                            className="text-[11px] px-2 py-0.5 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
+                        {/* Participation Group */}
+                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.length > 0 && (
+                          <th
+                            colSpan={partsList.length + 1}
+                            className="bg-blue-50 text-blue-800 border-x border-blue-200 py-1.5"
                           >
-                            + Part.
-                          </button>
-                        </div>
-                      </th>
-                    )}
+                            <div className="flex items-center justify-between px-2">
+                              <span>PARTICIPACIÓN (15% Total • {(15 / partsList.length).toFixed(1)}% c/u)</span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAdd('participation')}
+                                className="text-[11px] px-2 py-0.5 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
+                              >
+                                + Part.
+                              </button>
+                            </div>
+                          </th>
+                        )}
 
-                    {/* Attitude Group */}
-                    {attsList.length > 0 && (
-                      <th
-                        colSpan={attsList.length + 1}
-                        className="bg-amber-50 text-amber-800 border-x border-amber-200 py-1.5"
-                      >
-                        <div className="flex items-center justify-between px-2">
-                          <span>ACTITUDES (15% Total • {(15 / attsList.length).toFixed(1)}% c/u)</span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAdd('other')}
-                            className="text-[11px] px-2 py-0.5 rounded bg-amber-600 text-white font-semibold hover:bg-amber-700 transition cursor-pointer"
+                        {/* Attitude Group */}
+                        {(sectionFilter === 'all' || sectionFilter === 'attitude') && attsList.length > 0 && (
+                          <th
+                            colSpan={attsList.length + 1}
+                            className="bg-amber-50 text-amber-800 border-x border-amber-200 py-1.5"
                           >
-                            + Actitud
-                          </button>
-                        </div>
-                      </th>
-                    )}
+                            <div className="flex items-center justify-between px-2">
+                              <span>ACTITUDES (15% Total • {(15 / attsList.length).toFixed(1)}% c/u)</span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAdd('other')}
+                                className="text-[11px] px-2 py-0.5 rounded bg-amber-600 text-white font-semibold hover:bg-amber-700 transition cursor-pointer"
+                              >
+                                + Actitud
+                              </button>
+                            </div>
+                          </th>
+                        )}
 
-                    <th rowSpan={2} className="text-center font-black bg-blue-600 text-white text-xs align-middle">
-                      NOTA {selectedPeriod}
-                      <span className="block text-[10px] font-normal opacity-90">(100 pts)</span>
-                    </th>
-                  </tr>
+                        {sectionFilter === 'all' ? (
+                          <th rowSpan={2} className="text-center font-black bg-blue-600 text-white text-xs align-middle">
+                            NOTA {selectedPeriod}
+                            <span className="block text-[10px] font-normal opacity-90">(100 pts)</span>
+                          </th>
+                        ) : (
+                          <th rowSpan={2} className="text-center font-black bg-blue-600 text-white text-xs align-middle">
+                            NOTA FINAL
+                            <span className="block text-[10px] font-normal opacity-90">({selectedPeriod})</span>
+                          </th>
+                        )}
+                      </tr>
 
-                  {/* Tier 2 Header: Individual Activity Columns */}
-                  <tr className="bg-[var(--color-card)] text-center text-[11px]">
-                    <th className="text-left min-w-[170px]">Nombre</th>
-                    <th className="hidden sm:table-cell text-left min-w-[90px] text-[var(--color-muted)]">Matrícula</th>
+                      {/* Tier 2 Header: Individual Activity Columns */}
+                      <tr className="bg-[var(--color-card)] text-center text-[11px]">
+                        <th className="text-left min-w-[170px] sticky left-0 z-20 bg-[var(--color-card)]">Nombre</th>
+                        <th className="hidden sm:table-cell text-left min-w-[90px] text-[var(--color-muted)]">Matrícula</th>
 
-                    {/* Exam Columns */}
-                    {examsList.map((ev) => (
-                      <th key={ev.id} className="min-w-[80px] p-2 bg-red-50/40">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEval(ev)}
-                            className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
-                            title="Eliminar examen"
-                          >
-                            <X size={11} />
-                          </button>
-                        </div>
-                        <span className="text-[10px] text-red-600 block font-semibold">
-                          {(40 / examsList.length).toFixed(1)}%
-                        </span>
-                      </th>
-                    ))}
-                    {examsList.length > 0 && (
-                      <th className="min-w-[70px] bg-red-100/70 font-bold text-red-800 border-r border-red-200">
-                        Subt.(40)
-                      </th>
-                    )}
+                        {/* Exam Columns */}
+                        {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.map((ev) => (
+                          <th key={ev.id} className="min-w-[80px] p-2 bg-red-50/40">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEval(ev)}
+                                className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                                title="Eliminar examen"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                            <span className="text-[10px] text-red-600 block font-semibold">
+                              {(40 / examsList.length).toFixed(1)}%
+                            </span>
+                          </th>
+                        ))}
+                        {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.length > 0 && (
+                          <th className="min-w-[70px] bg-red-100/70 font-bold text-red-800 border-r border-red-200">
+                            Subt.(40)
+                          </th>
+                        )}
 
-                    {/* Task Columns */}
-                    {tasksList.map((ev) => (
-                      <th key={ev.id} className="min-w-[80px] p-2 bg-green-50/40">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEval(ev)}
-                            className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
-                            title="Eliminar tarea"
-                          >
-                            <X size={11} />
-                          </button>
-                        </div>
-                        <span className="text-[10px] text-green-600 block font-semibold">
-                          {(30 / tasksList.length).toFixed(1)}%
-                        </span>
-                      </th>
-                    ))}
-                    {tasksList.length > 0 && (
-                      <th className="min-w-[70px] bg-green-100/70 font-bold text-green-800 border-r border-green-200">
-                        Subt.(30)
-                      </th>
-                    )}
+                        {/* Task Columns */}
+                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.map((ev) => (
+                          <th key={ev.id} className="min-w-[80px] p-2 bg-green-50/40">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEval(ev)}
+                                className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                                title="Eliminar tarea"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                            <span className="text-[10px] text-green-600 block font-semibold">
+                              {(30 / tasksList.length).toFixed(1)}%
+                            </span>
+                          </th>
+                        ))}
+                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.length > 0 && (
+                          <th className="min-w-[70px] bg-green-100/70 font-bold text-green-800 border-r border-green-200">
+                            Subt.(30)
+                          </th>
+                        )}
 
-                    {/* Participation Columns */}
-                    {partsList.map((ev) => (
-                      <th key={ev.id} className="min-w-[80px] p-2 bg-blue-50/40">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEval(ev)}
-                            className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
-                            title="Eliminar"
-                          >
-                            <X size={11} />
-                          </button>
-                        </div>
-                        <span className="text-[10px] text-blue-600 block font-semibold">
-                          {(15 / partsList.length).toFixed(1)}%
-                        </span>
-                      </th>
-                    ))}
-                    {partsList.length > 0 && (
-                      <th className="min-w-[70px] bg-blue-100/70 font-bold text-blue-800 border-r border-blue-200">
-                        Subt.(15)
-                      </th>
-                    )}
+                        {/* Participation Columns */}
+                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.map((ev) => (
+                          <th key={ev.id} className="min-w-[80px] p-2 bg-blue-50/40">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEval(ev)}
+                                className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                            <span className="text-[10px] text-blue-600 block font-semibold">
+                              {(15 / partsList.length).toFixed(1)}%
+                            </span>
+                          </th>
+                        ))}
+                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.length > 0 && (
+                          <th className="min-w-[70px] bg-blue-100/70 font-bold text-blue-800 border-r border-blue-200">
+                            Subt.(15)
+                          </th>
+                        )}
 
-                    {/* Attitude Columns */}
-                    {attsList.map((ev) => (
-                      <th key={ev.id} className="min-w-[80px] p-2 bg-amber-50/40">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEval(ev)}
-                            className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
-                            title="Eliminar"
-                          >
-                            <X size={11} />
-                          </button>
-                        </div>
-                        <span className="text-[10px] text-amber-600 block font-semibold">
-                          {(15 / attsList.length).toFixed(1)}%
-                        </span>
-                      </th>
-                    ))}
-                    {attsList.length > 0 && (
-                      <th className="min-w-[70px] bg-amber-100/70 font-bold text-amber-800 border-r border-amber-200">
-                        Subt.(15)
-                      </th>
-                    )}
-                  </tr>
+                        {/* Attitude Columns */}
+                        {(sectionFilter === 'all' || sectionFilter === 'attitude') && attsList.map((ev) => (
+                          <th key={ev.id} className="min-w-[80px] p-2 bg-amber-50/40">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEval(ev)}
+                                className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                            <span className="text-[10px] text-amber-600 block font-semibold">
+                              {(15 / attsList.length).toFixed(1)}%
+                            </span>
+                          </th>
+                        ))}
+                        {(sectionFilter === 'all' || sectionFilter === 'attitude') && attsList.length > 0 && (
+                          <th className="min-w-[70px] bg-amber-100/70 font-bold text-amber-800 border-r border-amber-200">
+                            Subt.(15)
+                          </th>
+                        )}
+                      </tr>
+                    </>
+                  )}
                 </thead>
                 <tbody>
                   {students.map((student) => {
@@ -821,9 +993,57 @@ export default function GradesPage() {
                     const gradeMap = new Map(studentGrades.map((g) => [g.evaluationId, g.score]))
                     const breakdown = calculateStudentPeriodBreakdown(studentGrades, allEvaluations, selectedPeriod as PeriodId)
 
+                    // RENDER: RESUMEN / TOTALES
+                    if (sectionFilter === 'summary') {
+                      return (
+                        <tr key={student.id} className="hover:bg-[var(--color-bg-secondary)] transition-colors">
+                          <td className="font-semibold text-xs sticky left-0 z-10 bg-[var(--color-card)] border-r border-[var(--color-border)]">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="avatar avatar-sm font-semibold"
+                                style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', fontSize: 10 }}
+                              >
+                                {getInitials(student.firstName, student.lastName)}
+                              </div>
+                              <span>{getFullName(student.firstName, student.lastName)}</span>
+                            </div>
+                          </td>
+                          <td className="hidden sm:table-cell text-xs text-[var(--color-muted)] font-mono">
+                            {student.studentId}
+                          </td>
+                          <td className="text-center font-bold text-xs bg-red-50/30 text-red-700">
+                            {breakdown.categories.exam.pointsEarned.toFixed(1)} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ 40</span>
+                          </td>
+                          <td className="text-center font-bold text-xs bg-green-50/30 text-green-700">
+                            {breakdown.categories.task.pointsEarned.toFixed(1)} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ 30</span>
+                          </td>
+                          <td className="text-center font-bold text-xs bg-blue-50/30 text-blue-700">
+                            {breakdown.categories.participation.pointsEarned.toFixed(1)} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ 15</span>
+                          </td>
+                          <td className="text-center font-bold text-xs bg-amber-50/30 text-amber-700">
+                            {breakdown.categories.attitude.pointsEarned.toFixed(1)} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ 15</span>
+                          </td>
+                          <td className="text-center font-black text-sm bg-blue-50/80">
+                            {breakdown.hasGrades ? (
+                              <span className={cn('tabular-nums', getGradeColor(breakdown.totalScore))}>
+                                {breakdown.totalScore.toFixed(1)}
+                              </span>
+                            ) : (
+                              <span className="text-[var(--color-muted)] text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="text-center">
+                            <Badge variant={breakdown.totalScore >= 70 ? 'success' : 'danger'}>
+                              {breakdown.totalScore >= 70 ? 'Aprobado' : 'Riesgo'}
+                            </Badge>
+                          </td>
+                        </tr>
+                      )
+                    }
+
                     return (
                       <tr key={student.id} className="hover:bg-[var(--color-bg-secondary)] transition-colors">
-                        <td className="font-semibold text-xs">
+                        <td className="font-semibold text-xs sticky left-0 z-10 bg-[var(--color-card)] border-r border-[var(--color-border)]">
                           <div className="flex items-center gap-2">
                             <div
                               className="avatar avatar-sm font-semibold"
@@ -839,7 +1059,7 @@ export default function GradesPage() {
                         </td>
 
                         {/* Exam Cells */}
-                        {examsList.map((ev) => (
+                        {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.map((ev) => (
                           <td key={ev.id} className="text-center p-1.5 bg-red-50/20">
                             <MatrixGradeCell
                               score={gradeMap.get(ev.id)}
@@ -848,14 +1068,14 @@ export default function GradesPage() {
                             />
                           </td>
                         ))}
-                        {examsList.length > 0 && (
+                        {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.length > 0 && (
                           <td className="text-center font-bold text-xs bg-red-100/40 text-red-700 border-r border-red-200">
                             {breakdown.categories.exam.pointsEarned.toFixed(1)}
                           </td>
                         )}
 
                         {/* Task Cells */}
-                        {tasksList.map((ev) => (
+                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.map((ev) => (
                           <td key={ev.id} className="text-center p-1.5 bg-green-50/20">
                             <MatrixGradeCell
                               score={gradeMap.get(ev.id)}
@@ -864,14 +1084,14 @@ export default function GradesPage() {
                             />
                           </td>
                         ))}
-                        {tasksList.length > 0 && (
+                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.length > 0 && (
                           <td className="text-center font-bold text-xs bg-green-100/40 text-green-700 border-r border-green-200">
                             {breakdown.categories.task.pointsEarned.toFixed(1)}
                           </td>
                         )}
 
                         {/* Participation Cells */}
-                        {partsList.map((ev) => (
+                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.map((ev) => (
                           <td key={ev.id} className="text-center p-1.5 bg-blue-50/20">
                             <MatrixGradeCell
                               score={gradeMap.get(ev.id)}
@@ -880,14 +1100,14 @@ export default function GradesPage() {
                             />
                           </td>
                         ))}
-                        {partsList.length > 0 && (
+                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.length > 0 && (
                           <td className="text-center font-bold text-xs bg-blue-100/40 text-blue-700 border-r border-blue-200">
                             {breakdown.categories.participation.pointsEarned.toFixed(1)}
                           </td>
                         )}
 
                         {/* Attitude Cells */}
-                        {attsList.map((ev) => (
+                        {(sectionFilter === 'all' || sectionFilter === 'attitude') && attsList.map((ev) => (
                           <td key={ev.id} className="text-center p-1.5 bg-amber-50/20">
                             <MatrixGradeCell
                               score={gradeMap.get(ev.id)}
@@ -896,7 +1116,7 @@ export default function GradesPage() {
                             />
                           </td>
                         ))}
-                        {attsList.length > 0 && (
+                        {(sectionFilter === 'all' || sectionFilter === 'attitude') && attsList.length > 0 && (
                           <td className="text-center font-bold text-xs bg-amber-100/40 text-amber-700 border-r border-amber-200">
                             {breakdown.categories.attitude.pointsEarned.toFixed(1)}
                           </td>
@@ -1144,6 +1364,17 @@ export default function GradesPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Modal Confirmación de Eliminación */}
+      <ConfirmDialog
+        open={!!evalToDelete}
+        onClose={() => setEvalToDelete(null)}
+        onConfirm={confirmDeleteEval}
+        title="Eliminar evaluación"
+        message={`¿Eliminar la evaluación "${evalToDelete?.name}"? Los pesos de su categoría en ${selectedPeriod} se reajustarán automáticamente.`}
+        confirmLabel="Eliminar evaluación"
+        danger
+      />
     </>
   )
 }
