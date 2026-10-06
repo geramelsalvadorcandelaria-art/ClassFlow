@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Save, Plus, Trash2, Calendar, Table as TableIcon,
-  CheckSquare, BarChart3, PlusCircle, Layers, X, Filter
+  CheckSquare, BarChart3, PlusCircle, Layers, X, Filter,
+  SlidersHorizontal
 } from 'lucide-react'
 import { Button, Select, Card, Badge, PageHeader, EmptyState, Modal, Input, Textarea, ConfirmDialog } from '@/components/ui'
+import { CriteriaSettingsModal } from '@/components/common/CriteriaSettingsModal'
 import { db, useCourses } from '@/lib/mockData'
 import { useAppStore } from '@/store'
 import { toast } from '@/store'
@@ -12,7 +14,8 @@ import {
   getGradeColor, clamp, ACADEMIC_PERIODS, CRITERIA_CONFIG,
   CRITERIA_CATEGORIES, CRITERIA_FORM_OPTIONS, getCriteriaKey,
   getEvaluationDynamicWeight, calculateStudentPeriodBreakdown,
-  calculateStudentAnnualGrades, gradeLevel, gradeLevelLabels
+  calculateStudentAnnualGrades, gradeLevel, gradeLevelLabels,
+  getCriteriaWeights, calcularAporteCriterio
 } from '@/lib/utils'
 import type { Evaluation, Grade, EvaluationType, PeriodId, AcademicPeriodInfo } from '@/types'
 import { useForm } from 'react-hook-form'
@@ -258,6 +261,22 @@ export default function GradesPage() {
     return periodEvaluations.find((e) => e.id === evalId) ?? periodEvaluations[0]
   }, [periodEvaluations, evalId])
 
+  // Estado para modal de ponderaciones manuales
+  const [criteriaModalOpen, setCriteriaModalOpen] = useState(false)
+  const [criteriaRefreshKey, setCriteriaRefreshKey] = useState(0)
+
+  // Escuchar cambios de ponderaciones para recalcular automáticamente
+  useEffect(() => {
+    const handler = () => {
+      setCriteriaRefreshKey((k) => k + 1)
+      setRefreshKey((k) => k + 1)
+    }
+    window.addEventListener('classflow_criteria_changed', handler)
+    return () => window.removeEventListener('classflow_criteria_changed', handler)
+  }, [])
+
+  const currentWeights = useMemo(() => getCriteriaWeights(), [criteriaRefreshKey, refreshKey])
+
   // Save grade immediately in DB and trigger reactive update
   const handleUpdateGrade = useCallback((studentId: string, evaluationId: string, score: number) => {
     db.grades.upsert(courseId, { studentId, evaluationId, score })
@@ -307,9 +326,17 @@ export default function GradesPage() {
     <>
       <PageHeader
         title="Control de Calificaciones y Planilla"
-        subtitle={`${course?.name ?? 'Curso'} • Período actual: ${selectedPeriod} • Criterios: 40% Examen, 30% Tareas, 15% Part., 15% Actitud`}
+        subtitle={`${course?.name ?? 'Curso'} • Período: ${selectedPeriod} • Fórmula activa: ${currentWeights.exam}% Exámenes, ${currentWeights.task}% Tareas, ${currentWeights.participation}% Part., ${currentWeights.attitude}% Actitud`}
         actions={
           <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              leftIcon={<SlidersHorizontal size={15} />}
+              onClick={() => setCriteriaModalOpen(true)}
+              title="Ajustar puntos fijos y fórmula de los criterios"
+            >
+              Ponderaciones ({currentWeights.exam}/{currentWeights.task}/{currentWeights.participation}/{currentWeights.attitude})
+            </Button>
             <Button
               leftIcon={<Plus size={16} />}
               onClick={() => { setModalCategoryType('exam'); setNewEvalOpen(true) }}
@@ -449,9 +476,14 @@ export default function GradesPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-[var(--color-foreground)]">Exámenes</span>
-              <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-red-100 text-red-700">
-                40% fijo
-              </span>
+              <button
+                type="button"
+                onClick={() => setCriteriaModalOpen(true)}
+                title="Editar ponderación"
+                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                {currentWeights.exam} pts fijos ✏️
+              </button>
             </div>
             <div className="text-sm font-semibold mb-1">
               {examsList.length > 0 ? (
@@ -465,10 +497,10 @@ export default function GradesPage() {
             <p className="text-[11px] text-[var(--color-muted)] mb-2">
               {examsList.length > 0 ? (
                 <span>
-                  Cada examen vale <strong className="text-red-600">{(40 / examsList.length).toFixed(1)}%</strong> de {selectedPeriod}
+                  Cada examen vale <strong className="text-red-600">{(currentWeights.exam / examsList.length).toFixed(1)} pts</strong> de {selectedPeriod}
                 </span>
               ) : (
-                <span>Los 40 puntos se dividirán entre los que agregues</span>
+                <span>Los {currentWeights.exam} puntos se dividirán entre los que agregues</span>
               )}
             </p>
           </div>
@@ -492,9 +524,14 @@ export default function GradesPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-[var(--color-foreground)]">Tareas</span>
-              <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-green-100 text-green-700">
-                30% fijo
-              </span>
+              <button
+                type="button"
+                onClick={() => setCriteriaModalOpen(true)}
+                title="Editar ponderación"
+                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                {currentWeights.task} pts fijos ✏️
+              </button>
             </div>
             <div className="text-sm font-semibold mb-1">
               {tasksList.length > 0 ? (
@@ -508,10 +545,10 @@ export default function GradesPage() {
             <p className="text-[11px] text-[var(--color-muted)] mb-2">
               {tasksList.length > 0 ? (
                 <span>
-                  Cada tarea vale <strong className="text-green-600">{(30 / tasksList.length).toFixed(1)}%</strong> de {selectedPeriod}
+                  Cada tarea vale <strong className="text-green-600">{(currentWeights.task / tasksList.length).toFixed(1)} pts</strong> de {selectedPeriod}
                 </span>
               ) : (
-                <span>Los 30 puntos se dividirán entre las que agregues</span>
+                <span>Los {currentWeights.task} puntos se dividirán entre las que agregues</span>
               )}
             </p>
           </div>
@@ -535,9 +572,14 @@ export default function GradesPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-[var(--color-foreground)]">Participación</span>
-              <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                15% fijo
-              </span>
+              <button
+                type="button"
+                onClick={() => setCriteriaModalOpen(true)}
+                title="Editar ponderación"
+                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                {currentWeights.participation} pts fijos ✏️
+              </button>
             </div>
             <div className="text-sm font-semibold mb-1">
               {partsList.length > 0 ? (
@@ -551,10 +593,10 @@ export default function GradesPage() {
             <p className="text-[11px] text-[var(--color-muted)] mb-2">
               {partsList.length > 0 ? (
                 <span>
-                  Cada una vale <strong className="text-blue-600">{(15 / partsList.length).toFixed(1)}%</strong> de {selectedPeriod}
+                  Cada una vale <strong className="text-blue-600">{(currentWeights.participation / partsList.length).toFixed(1)} pts</strong> de {selectedPeriod}
                 </span>
               ) : (
-                <span>Los 15 puntos se dividirán automáticamente</span>
+                <span>Los {currentWeights.participation} puntos se dividirán automáticamente</span>
               )}
             </p>
           </div>
@@ -578,9 +620,14 @@ export default function GradesPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-[var(--color-foreground)]">Actitudes y Valores</span>
-              <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
-                15% fijo
-              </span>
+              <button
+                type="button"
+                onClick={() => setCriteriaModalOpen(true)}
+                title="Editar ponderación"
+                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                {currentWeights.attitude} pts fijos ✏️
+              </button>
             </div>
             <div className="text-sm font-semibold mb-1">
               {attsList.length > 0 ? (
@@ -594,10 +641,10 @@ export default function GradesPage() {
             <p className="text-[11px] text-[var(--color-muted)] mb-2">
               {attsList.length > 0 ? (
                 <span>
-                  Cada una vale <strong className="text-amber-600">{(15 / attsList.length).toFixed(1)}%</strong> de {selectedPeriod}
+                  Cada una vale <strong className="text-amber-600">{(currentWeights.attitude / attsList.length).toFixed(1)} pts</strong> de {selectedPeriod}
                 </span>
               ) : (
-                <span>Los 15 puntos se dividirán automáticamente</span>
+                <span>Los {currentWeights.attitude} puntos se dividirán automáticamente</span>
               )}
             </p>
           </div>
@@ -1374,6 +1421,16 @@ export default function GradesPage() {
         message={`¿Eliminar la evaluación "${evalToDelete?.name}"? Los pesos de su categoría en ${selectedPeriod} se reajustarán automáticamente.`}
         confirmLabel="Eliminar evaluación"
         danger
+      />
+
+      {/* Modal Ajustar Ponderaciones de Criterios (Fórmula manual) */}
+      <CriteriaSettingsModal
+        open={criteriaModalOpen}
+        onClose={() => setCriteriaModalOpen(false)}
+        onSaved={() => {
+          setCriteriaRefreshKey((k) => k + 1)
+          setRefreshKey((k) => k + 1)
+        }}
       />
     </>
   )

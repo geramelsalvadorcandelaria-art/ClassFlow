@@ -15,24 +15,30 @@ export const ACADEMIC_PERIODS: AcademicPeriodInfo[] = [
   { id: 'P4', name: 'Cuarto Período', shortName: 'P4', quarter: 4 },
 ]
 
-// ─── Evaluation Criteria (40% / 30% / 15% / 15% = 100%) ─────────
+// ─── Evaluation Criteria (Ponderaciones manuales configurables) ─────────
 export type CriteriaCategoryKey = 'exam' | 'task' | 'participation' | 'attitude'
 
 export interface CriteriaCategoryInfo {
   key: CriteriaCategoryKey
   name: string
-  weight: number // 40, 30, 15, 15
+  weight: number
   types: EvaluationType[]
   color: string
   bg: string
   badgeVariant: 'danger' | 'success' | 'info' | 'warning'
 }
 
-export const CRITERIA_CONFIG: Record<CriteriaCategoryKey, CriteriaCategoryInfo> = {
+export const DEFAULT_CRITERIA_WEIGHTS: Record<CriteriaCategoryKey, number> = {
+  exam: 30,          // 30 puntos
+  task: 30,          // 30 puntos
+  participation: 20,  // 20 puntos
+  attitude: 20,       // 20 puntos
+}
+
+const BASE_CRITERIA_META: Record<CriteriaCategoryKey, Omit<CriteriaCategoryInfo, 'weight'>> = {
   exam: {
     key: 'exam',
     name: 'Exámenes',
-    weight: 40,
     types: ['exam', 'quiz'],
     color: '#DC2626',
     bg: '#FEE2E2',
@@ -40,8 +46,7 @@ export const CRITERIA_CONFIG: Record<CriteriaCategoryKey, CriteriaCategoryInfo> 
   },
   task: {
     key: 'task',
-    name: 'Tareas',
-    weight: 30,
+    name: 'Tareas y Trabajos',
     types: ['task', 'project', 'work'],
     color: '#16A34A',
     bg: '#DCFCE7',
@@ -50,7 +55,6 @@ export const CRITERIA_CONFIG: Record<CriteriaCategoryKey, CriteriaCategoryInfo> 
   participation: {
     key: 'participation',
     name: 'Participación',
-    weight: 15,
     types: ['participation'],
     color: '#2563EB',
     bg: '#DBEAFE',
@@ -59,7 +63,6 @@ export const CRITERIA_CONFIG: Record<CriteriaCategoryKey, CriteriaCategoryInfo> 
   attitude: {
     key: 'attitude',
     name: 'Actitudes y Valores',
-    weight: 15,
     types: ['other'],
     color: '#D97706',
     bg: '#FEF3C7',
@@ -67,7 +70,95 @@ export const CRITERIA_CONFIG: Record<CriteriaCategoryKey, CriteriaCategoryInfo> 
   },
 }
 
-export const CRITERIA_CATEGORIES: CriteriaCategoryInfo[] = Object.values(CRITERIA_CONFIG)
+const CRITERIA_STORAGE_KEY = 'classflow_criteria_weights_v1'
+
+/**
+ * Obtiene las ponderaciones configuradas manualmente (o por defecto si no se han personalizado).
+ */
+export function getCriteriaWeights(): Record<CriteriaCategoryKey, number> {
+  try {
+    const saved = localStorage.getItem(CRITERIA_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (typeof parsed === 'object' && parsed !== null) {
+        return {
+          exam: Number(parsed.exam ?? DEFAULT_CRITERIA_WEIGHTS.exam),
+          task: Number(parsed.task ?? DEFAULT_CRITERIA_WEIGHTS.task),
+          participation: Number(parsed.participation ?? DEFAULT_CRITERIA_WEIGHTS.participation),
+          attitude: Number(parsed.attitude ?? DEFAULT_CRITERIA_WEIGHTS.attitude),
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error loading criteria weights from localStorage:', e)
+  }
+  return { ...DEFAULT_CRITERIA_WEIGHTS }
+}
+
+/**
+ * Guarda las ponderaciones manuales y notifica a la aplicación para recalcular al instante.
+ */
+export function saveCriteriaWeights(newWeights: Record<CriteriaCategoryKey, number>): void {
+  try {
+    localStorage.setItem(CRITERIA_STORAGE_KEY, JSON.stringify(newWeights))
+    window.dispatchEvent(new CustomEvent('classflow_criteria_changed', { detail: newWeights }))
+  } catch (e) {
+    console.error('Error saving criteria weights:', e)
+  }
+}
+
+/**
+ * Restablece las ponderaciones a los valores iniciales por defecto (30/30/20/20).
+ */
+export function resetCriteriaWeights(): Record<CriteriaCategoryKey, number> {
+  saveCriteriaWeights(DEFAULT_CRITERIA_WEIGHTS)
+  return { ...DEFAULT_CRITERIA_WEIGHTS }
+}
+
+/**
+ * Devuelve la configuración completa de criterios con los pesos actuales.
+ */
+export function getCriteriaConfig(): Record<CriteriaCategoryKey, CriteriaCategoryInfo> {
+  const weights = getCriteriaWeights()
+  const config = {} as Record<CriteriaCategoryKey, CriteriaCategoryInfo>
+  for (const k of Object.keys(BASE_CRITERIA_META) as CriteriaCategoryKey[]) {
+    config[k] = {
+      ...BASE_CRITERIA_META[k],
+      weight: weights[k] ?? DEFAULT_CRITERIA_WEIGHTS[k],
+    }
+  }
+  return config
+}
+
+export function getCriteriaCategories(): CriteriaCategoryInfo[] {
+  return Object.values(getCriteriaConfig())
+}
+
+// Proxy transparente para mantener compatibilidad con cualquier llamada directa a CRITERIA_CONFIG[key]
+export const CRITERIA_CONFIG: Record<CriteriaCategoryKey, CriteriaCategoryInfo> = new Proxy(
+  {} as Record<CriteriaCategoryKey, CriteriaCategoryInfo>,
+  {
+    get(_target, prop: string) {
+      const config = getCriteriaConfig()
+      if (prop in config) {
+        return config[prop as CriteriaCategoryKey]
+      }
+      return undefined
+    },
+    ownKeys() {
+      return Object.keys(BASE_CRITERIA_META)
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+      return {
+        enumerable: true,
+        configurable: true,
+        value: getCriteriaConfig()[prop as CriteriaCategoryKey],
+      }
+    },
+  }
+)
+
+export const CRITERIA_CATEGORIES: CriteriaCategoryInfo[] = Object.values(getCriteriaConfig())
 
 /**
  * Returns which evaluation criteria category an evaluation type maps to.
@@ -80,9 +171,59 @@ export function getCriteriaKey(type: EvaluationType): CriteriaCategoryKey {
 }
 
 /**
+ * Fórmula exacta de cálculo por criterio:
+ * funcion calcularAporteCriterio(notas, pesoCriterio, cantidadActividades):
+ *   si notas está vacío: retornar 0
+ *   puntosPorActividad = pesoCriterio / cantidadActividades
+ *   aporteTotal = 0
+ *   para cada nota en notas:
+ *     aporteTotal += (nota / 100) * puntosPorActividad
+ *   retornar aporteTotal
+ */
+export function calcularAporteCriterio(
+  notas: Array<{ score: number; maxScore?: number } | number>,
+  pesoCriterio: number,
+  totalActividades?: number
+): {
+  puntosPorActividad: number
+  aporteTotal: number
+  aportes: number[]
+} {
+  const count = totalActividades !== undefined && totalActividades > 0
+    ? totalActividades
+    : notas.length
+
+  if (count === 0 || notas.length === 0) {
+    return {
+      puntosPorActividad: count > 0 ? Math.round((pesoCriterio / count) * 100) / 100 : 0,
+      aporteTotal: 0,
+      aportes: [],
+    }
+  }
+
+  const puntosPorActividad = pesoCriterio / count
+  let aporteTotal = 0
+  const aportes: number[] = []
+
+  for (const n of notas) {
+    const notaSobre100 = typeof n === 'number'
+      ? n
+      : ((n.score / (n.maxScore || 100)) * 100)
+    const aporte = (notaSobre100 / 100) * puntosPorActividad
+    aporteTotal += aporte
+    aportes.push(Math.round(aporte * 100) / 100)
+  }
+
+  return {
+    puntosPorActividad: Math.round(puntosPorActividad * 100) / 100,
+    aporteTotal: Math.round(aporteTotal * 10) / 10,
+    aportes,
+  }
+}
+
+/**
  * Dynamically calculates the weight (%) of an evaluation within its period.
- * For example: If Period 1 has 5 exams, each exam gets 40 / 5 = 8.0%.
- * If it has 2 exams, each gets 40 / 2 = 20.0%.
+ * For example: If Period 1 has 5 exams, each exam gets (pesoExamen / 5).
  */
 export function getEvaluationDynamicWeight(
   evalItem: Evaluation,
@@ -90,7 +231,7 @@ export function getEvaluationDynamicWeight(
 ): number {
   const period = evalItem.period || 'P1'
   const catKey = getCriteriaKey(evalItem.type)
-  const catWeight = CRITERIA_CONFIG[catKey]?.weight ?? 0
+  const catWeight = getCriteriaWeights()[catKey] ?? DEFAULT_CRITERIA_WEIGHTS[catKey]
 
   const countInPeriod = allEvaluations.filter(
     (e) => (e.period || 'P1') === period && getCriteriaKey(e.type) === catKey
@@ -106,13 +247,13 @@ export function getEvaluationDynamicWeight(
 export interface CategoryBreakdown {
   key: CriteriaCategoryKey
   name: string
-  weight: number              // Category weight, e.g. 40
+  weight: number              // Category weight, e.g. 30
   color: string
   evaluationsCount: number    // Total evaluations in this category for this period
   gradedCount: number         // How many were graded for this student
   averagePercentage: number   // Student's average (0-100) in this category
   pointsEarned: number        // Points contributed to period grade (out of weight)
-  dynamicWeightEach: number   // Weight per evaluation, e.g. 8%
+  dynamicWeightEach: number   // Weight per evaluation, e.g. 10 pts
 }
 
 export interface PeriodBreakdown {
@@ -125,7 +266,7 @@ export interface PeriodBreakdown {
 }
 
 /**
- * Calculate detailed grade breakdown for a student in a specific period.
+ * Calculate detailed grade breakdown for a student in a specific period using the exact criteria formula.
  */
 export function calculateStudentPeriodBreakdown(
   grades: Grade[],
@@ -136,42 +277,50 @@ export function calculateStudentPeriodBreakdown(
   const periodInfo = ACADEMIC_PERIODS.find((p) => p.id === period) ?? { id: period, name: `Período ${period}`, shortName: period, quarter: 1 }
 
   const gradeMap = new Map(grades.map((g) => [g.evaluationId, g.score]))
+  const criteriaConfig = getCriteriaConfig()
+  const currentCategories = Object.values(criteriaConfig)
 
   const categories = {} as Record<CriteriaCategoryKey, CategoryBreakdown>
   let totalScore = 0
 
-  for (const cat of CRITERIA_CATEGORIES) {
+  for (const cat of currentCategories) {
     const catEvals = periodEvals.filter((e) => getCriteriaKey(e.type) === cat.key)
     const count = catEvals.length
-    const dynamicWeightEach = count > 0 ? Math.round((cat.weight / count) * 100) / 100 : 0
+    const catWeight = cat.weight
 
+    const gradedItems: Array<{ score: number; maxScore: number }> = []
     let scoreSum = 0
-    let gradedCount = 0
 
     for (const ev of catEvals) {
       const score = gradeMap.get(ev.id)
       if (score !== undefined) {
-        gradedCount++
+        gradedItems.push({ score, maxScore: ev.maxScore })
         scoreSum += (score / ev.maxScore) * 100
       }
     }
 
+    const { puntosPorActividad, aporteTotal } = calcularAporteCriterio(
+      gradedItems,
+      catWeight,
+      count
+    )
+
+    const gradedCount = gradedItems.length
     const averagePercentage = gradedCount > 0 ? Math.round((scoreSum / gradedCount) * 10) / 10 : 0
-    // Points earned = (averagePercentage / 100) * categoryWeight
-    const pointsEarned = gradedCount > 0 ? Math.round((averagePercentage * cat.weight / 100) * 10) / 10 : 0
+    const pointsEarned = aporteTotal
 
     totalScore += pointsEarned
 
     categories[cat.key] = {
       key: cat.key,
       name: cat.name,
-      weight: cat.weight,
+      weight: catWeight,
       color: cat.color,
       evaluationsCount: count,
       gradedCount,
       averagePercentage,
       pointsEarned,
-      dynamicWeightEach,
+      dynamicWeightEach: puntosPorActividad,
     }
   }
 

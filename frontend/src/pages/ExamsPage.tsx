@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react'
-import { Plus, Trash2, FileText, Calendar, Layers, CheckCircle2 } from 'lucide-react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { Plus, Trash2, FileText, Calendar, Layers, CheckCircle2, SlidersHorizontal } from 'lucide-react'
 import { Button, Card, Badge, Modal, Input, Select, Textarea, PageHeader, EmptyState, ConfirmDialog } from '@/components/ui'
+import { CriteriaSettingsModal } from '@/components/common/CriteriaSettingsModal'
 import { db, useCourses } from '@/lib/mockData'
 import { useAppStore } from '@/store'
 import { toast } from '@/store'
 import {
   evaluationTypeLabels, formatDate, cn, ACADEMIC_PERIODS,
   CRITERIA_CONFIG, CRITERIA_FORM_OPTIONS, getCriteriaKey,
-  getEvaluationDynamicWeight
+  getEvaluationDynamicWeight, getCriteriaWeights
 } from '@/lib/utils'
 import type { Evaluation, EvaluationType, PeriodId } from '@/types'
 import { useForm } from 'react-hook-form'
@@ -248,6 +249,16 @@ export default function ExamsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [refreshCount, setRefreshCount] = useState(0)
   const [evalToDelete, setEvalToDelete] = useState<Evaluation | null>(null)
+  const [criteriaModalOpen, setCriteriaModalOpen] = useState(false)
+
+  // Escuchar cambios de criterios
+  useEffect(() => {
+    const handler = () => setRefreshCount((c) => c + 1)
+    window.addEventListener('classflow_criteria_changed', handler)
+    return () => window.removeEventListener('classflow_criteria_changed', handler)
+  }, [])
+
+  const currentWeights = useMemo(() => getCriteriaWeights(), [refreshCount])
 
   const allEvals = useMemo(() => {
     return courses.flatMap((c) => db.evaluations.list(c.id))
@@ -277,11 +288,21 @@ export default function ExamsPage() {
     <>
       <PageHeader
         title="Exámenes y Evaluaciones"
-        subtitle={`${filtered.length} evaluaciones en total • Criterios ponderados automáticos (40/30/15/15)`}
+        subtitle={`${filtered.length} evaluaciones en total • Criterios activos: ${currentWeights.exam}% Exámenes, ${currentWeights.task}% Tareas, ${currentWeights.participation}% Part., ${currentWeights.attitude}% Actitud`}
         actions={
-          <Button leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>
-            Nueva evaluación
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              leftIcon={<SlidersHorizontal size={15} />}
+              onClick={() => setCriteriaModalOpen(true)}
+              title="Ajustar ponderaciones fijas"
+            >
+              Ponderaciones ({currentWeights.exam}/{currentWeights.task}/{currentWeights.participation}/{currentWeights.attitude})
+            </Button>
+            <Button leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>
+              Nueva evaluación
+            </Button>
+          </div>
         }
       />
 
@@ -394,6 +415,12 @@ export default function ExamsPage() {
         message={`¿Eliminar "${evalToDelete?.name}"? Los pesos del criterio se redistribuirán dinámicamente.`}
         confirmLabel="Eliminar evaluación"
         danger
+      />
+
+      <CriteriaSettingsModal
+        open={criteriaModalOpen}
+        onClose={() => setCriteriaModalOpen(false)}
+        onSaved={() => setRefreshCount((c) => c + 1)}
       />
     </>
   )
