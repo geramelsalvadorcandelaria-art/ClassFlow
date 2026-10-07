@@ -92,6 +92,27 @@ app.post('/api/sync', async (req, res) => {
     if (!stateData) {
       return res.status(400).json({ error: 'No data provided' })
     }
+    // Fusionar usuarios CUENTA POR CUENTA (gana el updatedAt más reciente de cada id)
+    const [oldRows] = await p.query('SELECT state_json FROM system_state WHERE id = ?', ['master_state'])
+    if (oldRows.length > 0 && oldRows[0].state_json) {
+      try {
+        const old = JSON.parse(oldRows[0].state_json)
+        const deleted = Array.from(new Set([
+          ...(Array.isArray(old.deletedUserIds) ? old.deletedUserIds : []),
+          ...(Array.isArray(stateData.deletedUserIds) ? stateData.deletedUserIds : []),
+        ]))
+        const map = new Map()
+        for (const u of [...(Array.isArray(old.users) ? old.users : []), ...(Array.isArray(stateData.users) ? stateData.users : [])]) {
+          if (!u || !u.id || deleted.includes(u.id)) continue
+          const prev = map.get(u.id)
+          if (!prev || (u.updatedAt || 0) > (prev.updatedAt || 0)) map.set(u.id, u)
+        }
+        stateData.users = Array.from(map.values())
+        stateData.deletedUserIds = deleted
+      } catch (e) {
+        // estado previo ilegible: se guarda el nuevo tal cual
+      }
+    }
     const stateJson = JSON.stringify(stateData)
     await p.query(
       `INSERT INTO system_state (id, state_json, updated_at) 

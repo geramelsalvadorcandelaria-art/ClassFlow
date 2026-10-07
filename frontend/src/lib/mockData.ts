@@ -299,6 +299,7 @@ interface MasterDB {
   evaluations: Record<string, Evaluation[]>
   grades: Record<string, Grade[]>
   users: User[]
+  deletedUserIds?: string[]
 }
 
 const STORAGE_KEY = 'classflow_master_db_v2'
@@ -400,6 +401,21 @@ function pushToServer() {
   }, 300)
 }
 
+/**
+ * Fusiona listas de usuarios CUENTA POR CUENTA usando updatedAt.
+ * Así el perfil de Pedro y el de Geramel nunca se pisan entre sí aunque
+ * un dispositivo tenga datos viejos.
+ */
+export function mergeUsers(local: User[], remote: User[], deletedIds: string[] = []): User[] {
+  const map = new Map<string, User>()
+  for (const u of [...(local || []), ...(remote || [])]) {
+    if (!u || !u.id || deletedIds.includes(u.id)) continue
+    const prev = map.get(u.id)
+    if (!prev || (u.updatedAt ?? 0) > (prev.updatedAt ?? 0)) map.set(u.id, u)
+  }
+  return Array.from(map.values())
+}
+
 let _usersSyncListener: ((users: User[]) => void) | null = null
 
 export function onUsersSync(callback: (users: User[]) => void) {
@@ -457,9 +473,14 @@ export async function pullFromServer() {
         if (json.data.evaluations) _dbState.evaluations = json.data.evaluations
         if (json.data.grades) _dbState.grades = json.data.grades
         if (Array.isArray(json.data.users) && json.data.users.length > 0) {
-          _dbState.users = json.data.users
+          const deleted = Array.from(new Set([
+            ...(_dbState.deletedUserIds || []),
+            ...(Array.isArray(json.data.deletedUserIds) ? json.data.deletedUserIds : []),
+          ]))
+          _dbState.deletedUserIds = deleted
+          _dbState.users = mergeUsers(_dbState.users, json.data.users, deleted)
           if (_usersSyncListener) {
-            _usersSyncListener(json.data.users)
+            _usersSyncListener(_dbState.users)
           }
         }
         persistDB(false)
@@ -641,8 +662,12 @@ export const db = {
   },
   users: {
     list: () => _dbState.users || [...DEFAULT_USERS],
-    sync: (users: User[]) => {
-      _dbState.users = users
+    sync: (users: User[], deletedIds: string[] = []) => {
+      if (deletedIds.length) {
+        _dbState.deletedUserIds = Array.from(new Set([...(_dbState.deletedUserIds || []), ...deletedIds]))
+      }
+      // Los usuarios locales ya traen su updatedAt; se fusionan cuenta por cuenta
+      _dbState.users = mergeUsers(users, [], _dbState.deletedUserIds || [])
       persistDB()
     },
   },

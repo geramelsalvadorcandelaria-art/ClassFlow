@@ -129,12 +129,11 @@ export const useAuthStore = create<AuthState>()(
       notifications: INITIAL_NOTIFICATIONS,
 
       login: (user, token) => {
+        // Solo se agrega si no existe; NUNCA se sobreescribe el registro de otra cuenta
         const currentUsers = get().users
         const exists = currentUsers.find((u) => u.id === user.id)
-        const updatedUsers = exists
-          ? currentUsers.map((u) => (u.id === user.id ? { ...u, ...user } : u))
-          : [...currentUsers, user]
-        set({ user, token, isAuthenticated: true, users: updatedUsers })
+        const updatedUsers = exists ? currentUsers : [...currentUsers, user]
+        set({ user: exists ?? user, token, isAuthenticated: true, users: updatedUsers })
         db.users.sync(updatedUsers)
       },
 
@@ -152,8 +151,9 @@ export const useAuthStore = create<AuthState>()(
       setUsers: (users) => {
         const cur = get().user
         if (cur) {
+          // La sesión se toma SOLO del registro con el mismo id (nunca se mezcla con otra cuenta)
           const freshCur = users.find((u) => u.id === cur.id)
-          set({ users, user: freshCur ? { ...cur, ...freshCur } : cur })
+          set({ users, user: freshCur ?? cur })
         } else {
           set({ users })
         }
@@ -162,7 +162,7 @@ export const useAuthStore = create<AuthState>()(
       updateUser: (data) => {
         const cur = get().user
         if (!cur) return
-        const updated = { ...cur, ...data }
+        const updated = { ...cur, ...data, id: cur.id, updatedAt: Date.now() }
         const updatedUsers = get().users.map((u) => (u.id === cur.id ? updated : u))
         set({ user: updated, users: updatedUsers })
         db.users.sync(updatedUsers)
@@ -182,9 +182,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateUserById: (id, data) => {
-        const updatedUsers = get().users.map((u) => (u.id === id ? { ...u, ...data } : u))
+        const stamp = Date.now()
+        const updatedUsers = get().users.map((u) => (u.id === id ? { ...u, ...data, id, updatedAt: stamp } : u))
         const cur = get().user
-        const updatedCurrent = cur && cur.id === id ? { ...cur, ...data } : cur
+        const updatedCurrent = cur && cur.id === id ? { ...cur, ...data, id, updatedAt: stamp } : cur
         set({ users: updatedUsers, user: updatedCurrent })
         db.users.sync(updatedUsers)
       },
@@ -194,7 +195,7 @@ export const useAuthStore = create<AuthState>()(
         if (cur?.id === id) return false // Prevent deleting yourself
         const updatedUsers = get().users.filter((u) => u.id !== id)
         set({ users: updatedUsers })
-        db.users.sync(updatedUsers)
+        db.users.sync(updatedUsers, [id])
         return true
       },
 

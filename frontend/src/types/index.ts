@@ -44,6 +44,8 @@ export interface User {
   active?: boolean;
   permissions?: Partial<SystemModuleConfig>;
   createdAt: string;
+  /** Marca de tiempo (ms) de la última edición de ESTE usuario; sirve para fusionar sin pisar otras cuentas */
+  updatedAt?: number;
 }
 
 // ─── Course ─────────────────────────────────────────────────

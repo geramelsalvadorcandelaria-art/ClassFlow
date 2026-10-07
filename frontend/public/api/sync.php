@@ -109,6 +109,36 @@ if ($method === 'POST') {
             exit();
         }
 
+        // Fusionar usuarios CUENTA POR CUENTA (gana el updatedAt más reciente de cada id)
+        $stmtOld = $pdo->prepare("SELECT state_json FROM system_state WHERE id = 'master_state'");
+        $stmtOld->execute();
+        $rowOld = $stmtOld->fetch();
+        if ($rowOld && !empty($rowOld['state_json'])) {
+            $old = json_decode($rowOld['state_json'], true);
+            if (is_array($old)) {
+                $deleted = array_values(array_unique(array_merge(
+                    isset($old['deletedUserIds']) && is_array($old['deletedUserIds']) ? $old['deletedUserIds'] : [],
+                    isset($decoded['deletedUserIds']) && is_array($decoded['deletedUserIds']) ? $decoded['deletedUserIds'] : []
+                )));
+                $map = [];
+                $lists = [
+                    isset($old['users']) && is_array($old['users']) ? $old['users'] : [],
+                    isset($decoded['users']) && is_array($decoded['users']) ? $decoded['users'] : []
+                ];
+                foreach ($lists as $list) {
+                    foreach ($list as $u) {
+                        if (!is_array($u) || empty($u['id']) || in_array($u['id'], $deleted, true)) continue;
+                        $ts = isset($u['updatedAt']) ? $u['updatedAt'] : 0;
+                        $prevTs = isset($map[$u['id']]['updatedAt']) ? $map[$u['id']]['updatedAt'] : -1;
+                        if (!isset($map[$u['id']]) || $ts > $prevTs) $map[$u['id']] = $u;
+                    }
+                }
+                $decoded['users'] = array_values($map);
+                $decoded['deletedUserIds'] = $deleted;
+                $raw = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+        }
+
         $stmt = $pdo->prepare("INSERT INTO system_state (id, state_json, updated_at) 
             VALUES ('master_state', :json, NOW()) 
             ON DUPLICATE KEY UPDATE state_json = VALUES(state_json), updated_at = NOW()");
