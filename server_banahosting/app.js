@@ -112,17 +112,27 @@ app.post('/api/sync', async (req, res) => {
 
         // Separar datos POR USUARIO: solo se aceptan los cursos del que sincroniza
         const pusher = stateData.pushedBy || null
-        const legacy = 'u-geramel'
-        const ownerOf = (c) => c.ownerId || legacy
+        const normalizeOwner = (id) => {
+          if (id === 'u-geramel' || id === 'u-admin') return 'u-admin'
+          if (id === 'u-1791219104305' || id === 'u-pedro') return 'u-1791219104305'
+          return id || 'u-admin'
+        }
         const oldCourses = Array.isArray(old.courses) ? old.courses : []
         const newCourses = Array.isArray(stateData.courses) ? stateData.courses : []
         const finalCourses = []
         for (const c of oldCourses) {
-          if (!pusher || ownerOf(c) !== pusher) finalCourses.push({ ...c, ownerId: ownerOf(c) })
+          const cOwner = normalizeOwner(c.ownerId)
+          if (!pusher || cOwner !== normalizeOwner(pusher)) {
+            finalCourses.push({ ...c, ownerId: cOwner })
+          }
         }
         if (pusher) {
+          const normPusher = normalizeOwner(pusher)
           for (const c of newCourses) {
-            if (ownerOf(c) === pusher) finalCourses.push({ ...c, ownerId: pusher })
+            const cOwner = normalizeOwner(c.ownerId)
+            if (cOwner === normPusher) {
+              finalCourses.push({ ...c, ownerId: normPusher })
+            }
           }
         }
         for (const k of ['students', 'attendance', 'evaluations', 'grades']) {

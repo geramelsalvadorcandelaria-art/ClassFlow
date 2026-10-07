@@ -9,8 +9,20 @@ import realStudentsFile from './realStudentsData.json'
 export const REAL_COURSES: Course[] = realStudentsFile.courses as Course[]
 export const REAL_STUDENTS_BY_COURSE: Record<string, Student[]> = realStudentsFile.students as Record<string, Student[]>
 
-/** Dueño por defecto de los cursos que existían antes de separar las cuentas */
-export const LEGACY_OWNER_ID = 'u-geramel'
+/** Dueño por defecto de los cursos preexistentes */
+export const LEGACY_OWNER_ID = 'u-admin'
+
+export const GERAMEL_IDS = ['u-admin', 'u-geramel']
+export const PEDRO_IDS = ['u-1791219104305', 'u-pedro']
+
+export function isSameOwner(courseOwnerId: string | undefined, currentUserId: string | null): boolean {
+  if (!currentUserId) return false
+  const owner = courseOwnerId || LEGACY_OWNER_ID
+  if (owner === currentUserId) return true
+  if (GERAMEL_IDS.includes(owner) && GERAMEL_IDS.includes(currentUserId)) return true
+  if (PEDRO_IDS.includes(owner) && PEDRO_IDS.includes(currentUserId)) return true
+  return false
+}
 
 /** Id del usuario con sesión activa (leído del almacenamiento de sesión, sin dependencia circular con el store) */
 export function getCurrentUserId(): string | null {
@@ -263,28 +275,28 @@ export function getAttendanceForDate(courseId: string, date: string): Attendance
 // ─── Mutable persistent state (LocalStorage Database) ────────────────
 export const DEFAULT_USERS: User[] = [
   {
-    id: 'u-geramel',
+    id: 'u-admin',
     name: 'Geramel Salvador Candelaria',
     email: 'geramelsalvadorcandelaria@gmail.com',
     role: 'admin',
     password: 'admin',
-    photo: '',
-    department: 'Dirección General',
-    phone: '+1 (555) 019-2831',
+    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    department: 'informatica',
+    phone: '829-505-4822',
     active: true,
     createdAt: '2026-01-10T00:00:00Z',
   },
   {
-    id: 'u-pedro',
+    id: 'u-1791219104305',
     name: 'PEDRO',
     email: 'pjceballos12@gmail.com',
     role: 'admin',
-    password: 'demo',
+    password: '12345678',
     photo: '',
-    department: 'Dirección General',
-    phone: '+1 (555) 987-6543',
+    department: 'pjceballos12@gmail.com',
+    phone: '+1 (555) 000-0000',
     active: true,
-    createdAt: '2026-02-01T00:00:00Z',
+    createdAt: '2026-10-05T16:51:44.305Z',
   },
   {
     id: 'u1',
@@ -534,11 +546,11 @@ export const db = {
     /** Solo los cursos del usuario con sesión activa */
     list: () => {
       const uid = getCurrentUserId()
-      return _dbState.courses.filter((c) => (c.ownerId || LEGACY_OWNER_ID) === uid)
+      return _dbState.courses.filter((c) => isSameOwner(c.ownerId, uid))
     },
     get: (id: string) => {
       const uid = getCurrentUserId()
-      return _dbState.courses.find((c) => c.id === id && (c.ownerId || LEGACY_OWNER_ID) === uid) ?? null
+      return _dbState.courses.find((c) => c.id === id && isSameOwner(c.ownerId, uid)) ?? null
     },
     create: (data: Omit<Course, 'id'>) => {
       const c: Course = { ...data, id: `c${Date.now()}`, ownerId: getCurrentUserId() || LEGACY_OWNER_ID, studentCount: 0, averageGrade: 0, attendanceRate: 0 }

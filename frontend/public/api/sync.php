@@ -139,17 +139,29 @@ if ($method === 'POST') {
                 // Separar datos POR USUARIO: de este envío solo se aceptan los cursos del que sincroniza.
                 // Los cursos de los demás se conservan tal como están en el servidor.
                 $pusher = isset($decoded['pushedBy']) ? $decoded['pushedBy'] : null;
-                $legacy = 'u-geramel';
+                $normalizeOwner = function ($id) {
+                    if ($id === 'u-geramel' || $id === 'u-admin') return 'u-admin';
+                    if ($id === 'u-1791219104305' || $id === 'u-pedro') return 'u-1791219104305';
+                    return !empty($id) ? $id : 'u-admin';
+                };
                 $oldCourses = isset($old['courses']) && is_array($old['courses']) ? $old['courses'] : [];
                 $newCourses = isset($decoded['courses']) && is_array($decoded['courses']) ? $decoded['courses'] : [];
-                $ownerOf = function ($c) use ($legacy) { return !empty($c['ownerId']) ? $c['ownerId'] : $legacy; };
                 $finalCourses = [];
                 foreach ($oldCourses as $c) {
-                    if (!$pusher || $ownerOf($c) !== $pusher) { $c['ownerId'] = $ownerOf($c); $finalCourses[] = $c; }
+                    $cOwner = $normalizeOwner(!empty($c['ownerId']) ? $c['ownerId'] : null);
+                    $c['ownerId'] = $cOwner;
+                    if (!$pusher || $cOwner !== $normalizeOwner($pusher)) {
+                        $finalCourses[] = $c;
+                    }
                 }
                 if ($pusher) {
+                    $normPusher = $normalizeOwner($pusher);
                     foreach ($newCourses as $c) {
-                        if ($ownerOf($c) === $pusher) { $c['ownerId'] = $pusher; $finalCourses[] = $c; }
+                        $cOwner = $normalizeOwner(!empty($c['ownerId']) ? $c['ownerId'] : null);
+                        if ($cOwner === $normPusher) {
+                            $c['ownerId'] = $normPusher;
+                            $finalCourses[] = $c;
+                        }
                     }
                 }
                 $keys = ['students', 'attendance', 'evaluations', 'grades'];

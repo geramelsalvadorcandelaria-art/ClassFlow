@@ -1,0 +1,38 @@
+{
+  "users": [
+    {
+      "id": "u-admin",
+      "name": "Geramel Salvador Candelaria",
+      "email": "geramelsalvadorcandelaria@gmail.com",
+      "role": "admin",
+      "photo": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+      "department": "informatica",
+      "phone": "829-505-4822",
+      "active": true,
+      "createdAt": "2026-01-10T00:00:00Z"
+    },
+    {
+      "name": "PEDRO",
+      "email": "pjceballos12@gmail.com",
+      "role": "admin",
+      "department": "pjceballos12@gmail.com",
+      "phone": "+1 (555) 000-0000",
+      "active": true,
+      "photo": "",
+      "password": "12345678",
+      "id": "u-1791219104305",
+      "createdAt": "2026-10-05T16:51:44.305Z"
+    }
+  ],
+  "systemModules": {
+    "dashboard": true,
+    "courses": true,
+    "students": true,
+    "attendance": true,
+    "grades": true,
+    "exams": true,
+    "reports": true,
+    "settings": true
+  },
+  "date": "2026-10-07T11:33:49.060Z"
+}
