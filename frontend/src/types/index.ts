@@ -60,6 +60,8 @@ export interface Course {
   startDate: string;
   endDate: string;
   teacherId: string;
+  /** Usuario dueño del curso: solo él ve el curso y sus estudiantes, asistencia y notas */
+  ownerId?: string;
   status: CourseStatus;
   studentCount?: number;
   averageGrade?: number;

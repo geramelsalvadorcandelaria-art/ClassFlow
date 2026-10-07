@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, SystemModuleConfig, AppNotification } from '@/types'
 import { storage } from '@/lib/utils'
-import { db, onUsersSync } from '@/lib/mockData'
+import { db, onUsersSync, notifyCoursesChanged } from '@/lib/mockData'
 
 export const DEFAULT_SYSTEM_MODULES: SystemModuleConfig = {
   dashboard: true,
@@ -135,6 +135,9 @@ export const useAuthStore = create<AuthState>()(
         const updatedUsers = exists ? currentUsers : [...currentUsers, user]
         set({ user: exists ?? user, token, isAuthenticated: true, users: updatedUsers })
         db.users.sync(updatedUsers)
+        // Cada cuenta ve solo sus propios cursos: reiniciar selección y refrescar listas
+        useAppStore.getState().setSelectedCourse(null)
+        notifyCoursesChanged()
       },
 
       logout: () => {
@@ -146,6 +149,8 @@ export const useAuthStore = create<AuthState>()(
           } catch {}
         }
         set({ user: null, token: null, isAuthenticated: false })
+        useAppStore.getState().setSelectedCourse(null)
+        notifyCoursesChanged()
       },
 
       setUsers: (users) => {

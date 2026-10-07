@@ -109,6 +109,33 @@ app.post('/api/sync', async (req, res) => {
         }
         stateData.users = Array.from(map.values())
         stateData.deletedUserIds = deleted
+
+        // Separar datos POR USUARIO: solo se aceptan los cursos del que sincroniza
+        const pusher = stateData.pushedBy || null
+        const legacy = 'u-geramel'
+        const ownerOf = (c) => c.ownerId || legacy
+        const oldCourses = Array.isArray(old.courses) ? old.courses : []
+        const newCourses = Array.isArray(stateData.courses) ? stateData.courses : []
+        const finalCourses = []
+        for (const c of oldCourses) {
+          if (!pusher || ownerOf(c) !== pusher) finalCourses.push({ ...c, ownerId: ownerOf(c) })
+        }
+        if (pusher) {
+          for (const c of newCourses) {
+            if (ownerOf(c) === pusher) finalCourses.push({ ...c, ownerId: pusher })
+          }
+        }
+        for (const k of ['students', 'attendance', 'evaluations', 'grades']) {
+          const oldK = old[k] || {}
+          const newK = stateData[k] || {}
+          const res = {}
+          for (const c of finalCourses) {
+            res[c.id] = (pusher && c.ownerId === pusher) ? (newK[c.id] || []) : (oldK[c.id] || [])
+          }
+          stateData[k] = res
+        }
+        stateData.courses = finalCourses
+        delete stateData.pushedBy
       } catch (e) {
         // estado previo ilegible: se guarda el nuevo tal cual
       }

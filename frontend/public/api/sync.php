@@ -135,6 +135,40 @@ if ($method === 'POST') {
                 }
                 $decoded['users'] = array_values($map);
                 $decoded['deletedUserIds'] = $deleted;
+
+                // Separar datos POR USUARIO: de este envío solo se aceptan los cursos del que sincroniza.
+                // Los cursos de los demás se conservan tal como están en el servidor.
+                $pusher = isset($decoded['pushedBy']) ? $decoded['pushedBy'] : null;
+                $legacy = 'u-geramel';
+                $oldCourses = isset($old['courses']) && is_array($old['courses']) ? $old['courses'] : [];
+                $newCourses = isset($decoded['courses']) && is_array($decoded['courses']) ? $decoded['courses'] : [];
+                $ownerOf = function ($c) use ($legacy) { return !empty($c['ownerId']) ? $c['ownerId'] : $legacy; };
+                $finalCourses = [];
+                foreach ($oldCourses as $c) {
+                    if (!$pusher || $ownerOf($c) !== $pusher) { $c['ownerId'] = $ownerOf($c); $finalCourses[] = $c; }
+                }
+                if ($pusher) {
+                    foreach ($newCourses as $c) {
+                        if ($ownerOf($c) === $pusher) { $c['ownerId'] = $pusher; $finalCourses[] = $c; }
+                    }
+                }
+                $keys = ['students', 'attendance', 'evaluations', 'grades'];
+                foreach ($keys as $k) {
+                    $oldK = isset($old[$k]) && is_array($old[$k]) ? $old[$k] : [];
+                    $newK = isset($decoded[$k]) && is_array($decoded[$k]) ? $decoded[$k] : [];
+                    $res = [];
+                    foreach ($finalCourses as $c) {
+                        $id = $c['id'];
+                        if ($pusher && $c['ownerId'] === $pusher) {
+                            $res[$id] = isset($newK[$id]) ? $newK[$id] : [];
+                        } else {
+                            $res[$id] = isset($oldK[$id]) ? $oldK[$id] : [];
+                        }
+                    }
+                    $decoded[$k] = (object)$res;
+                }
+                $decoded['courses'] = $finalCourses;
+                unset($decoded['pushedBy']);
                 $raw = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             }
         }

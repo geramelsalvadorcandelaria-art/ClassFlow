@@ -9,6 +9,26 @@ import realStudentsFile from './realStudentsData.json'
 export const REAL_COURSES: Course[] = realStudentsFile.courses as Course[]
 export const REAL_STUDENTS_BY_COURSE: Record<string, Student[]> = realStudentsFile.students as Record<string, Student[]>
 
+/** Dueño por defecto de los cursos que existían antes de separar las cuentas */
+export const LEGACY_OWNER_ID = 'u-geramel'
+
+/** Id del usuario con sesión activa (leído del almacenamiento de sesión, sin dependencia circular con el store) */
+export function getCurrentUserId(): string | null {
+  try {
+    if (typeof window === 'undefined') return null
+    const raw = localStorage.getItem('classflow-auth-v3')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed?.state?.user?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+function withOwner(courses: Course[]): Course[] {
+  return courses.map((c) => (c.ownerId ? c : { ...c, ownerId: LEGACY_OWNER_ID }))
+}
+
 // ─── Seed data ────────────────────────────────────────────────
 
 export const MOCK_COURSES: Course[] = [
@@ -341,6 +361,7 @@ function initMasterDB(): MasterDB {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
             } catch {}
           }
+          parsed.courses = withOwner(parsed.courses)
           return parsed
         }
       }
@@ -351,7 +372,7 @@ function initMasterDB(): MasterDB {
 
   // Initial Seed
   const seeded: MasterDB = {
-    courses: [...MOCK_COURSES],
+    courses: withOwner([...MOCK_COURSES]),
     students: Object.fromEntries(
       Object.entries(MOCK_STUDENTS_BY_COURSE).map(([k, v]) => [k, [...v]])
     ),
@@ -393,7 +414,7 @@ function pushToServer() {
       await fetch(getSyncUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(_dbState),
+        body: JSON.stringify({ ..._dbState, pushedBy: getCurrentUserId() }),
       })
     } catch (e) {
       // Quiet fail if server is offline or local dev
@@ -444,12 +465,12 @@ export function notifyCoursesChanged() {
 
 /** Hook reactivo para obtener los cursos actualizados al instante en cualquier componente */
 export function useCourses(): Course[] {
-  const [courses, setCourses] = useState<Course[]>(() => _dbState.courses || [])
+  const [courses, setCourses] = useState<Course[]>(() => db.courses.list())
 
   useEffect(() => {
-    setCourses([..._dbState.courses])
+    setCourses([...db.courses.list()])
     const unsubscribe = onCoursesChange(() => {
-      setCourses([..._dbState.courses])
+      setCourses([...db.courses.list()])
     })
     return unsubscribe
   }, [])
@@ -465,7 +486,7 @@ export async function pullFromServer() {
       const json = await res.json()
       if (json.success && json.data) {
         if (Array.isArray(json.data.courses)) {
-          _dbState.courses = json.data.courses
+          _dbState.courses = withOwner(json.data.courses)
           notifyCoursesChanged()
         }
         if (json.data.students) _dbState.students = json.data.students
@@ -510,10 +531,17 @@ function persistDB(shouldPush = true) {
 
 export const db = {
   courses: {
-    list: () => _dbState.courses,
-    get: (id: string) => _dbState.courses.find((c) => c.id === id) ?? null,
+    /** Solo los cursos del usuario con sesión activa */
+    list: () => {
+      const uid = getCurrentUserId()
+      return _dbState.courses.filter((c) => (c.ownerId || LEGACY_OWNER_ID) === uid)
+    },
+    get: (id: string) => {
+      const uid = getCurrentUserId()
+      return _dbState.courses.find((c) => c.id === id && (c.ownerId || LEGACY_OWNER_ID) === uid) ?? null
+    },
     create: (data: Omit<Course, 'id'>) => {
-      const c: Course = { ...data, id: `c${Date.now()}`, studentCount: 0, averageGrade: 0, attendanceRate: 0 }
+      const c: Course = { ...data, id: `c${Date.now()}`, ownerId: getCurrentUserId() || LEGACY_OWNER_ID, studentCount: 0, averageGrade: 0, attendanceRate: 0 }
       _dbState.courses.push(c)
       _dbState.students[c.id] = []
       _dbState.evaluations[c.id] = []
