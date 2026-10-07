@@ -17,10 +17,11 @@ interface CriteriaSettingsModalProps {
 export function CriteriaSettingsModal({ isOpen, open, onClose, onSaved }: CriteriaSettingsModalProps) {
   const show = isOpen ?? open ?? false
   const [weights, setWeights] = useState<Record<CriteriaCategoryKey, number>>({
-    exam: 30,
-    task: 30,
-    participation: 20,
-    attitude: 20,
+    lab: 30,
+    project: 25,
+    exam: 20,
+    exposition: 15,
+    attitude: 10,
   })
 
   // Cargar pesos actuales al abrir el modal
@@ -45,7 +46,7 @@ export function CriteriaSettingsModal({ isOpen, open, onClose, onSaved }: Criter
   const handleReset = () => {
     const defaults = resetCriteriaWeights()
     setWeights(defaults)
-    toast.info('Valores restablecidos', 'Se aplicó la configuración por defecto (30/30/20/20)')
+    toast.info('Valores restablecidos', 'Se aplicó la configuración por defecto (30/25/20/15/10)')
     onSaved?.()
   }
 
@@ -62,15 +63,15 @@ export function CriteriaSettingsModal({ isOpen, open, onClose, onSaved }: Criter
   }
 
   // Simulación didáctica basada en los valores actuales
-  const simExams = weights.exam || 0
-  const simPointsPerExam = (simExams / 3).toFixed(1)
-  const simSampleAporte = ((85 / 100) * (simExams / 3)).toFixed(1)
+  const simLab = weights.lab || 0
+  const simPointsPerLab = (simLab / 3).toFixed(1)
+  const simSampleAporte = ((85 / 100) * (simLab / 3)).toFixed(1)
 
   return (
     <Modal
       open={show}
       onClose={onClose}
-      title="Ajustar Criterios y Ponderaciones"
+      title="Ajustar Criterios y Ponderaciones por RA"
       maxWidth="lg"
     >
       <div className="space-y-5">
@@ -95,8 +96,8 @@ export function CriteriaSettingsModal({ isOpen, open, onClose, onSaved }: Criter
         {/* Formulario de Criterios */}
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs font-semibold text-[var(--color-muted)] px-1">
-            <span>Criterio de Evaluación</span>
-            <span>Puntos Asignados (de 100)</span>
+            <span>Instrumento / Criterio de Evaluación</span>
+            <span>Puntos Asignados (de 100 pts)</span>
           </div>
 
           {categories.map((cat) => {
@@ -122,10 +123,11 @@ export function CriteriaSettingsModal({ isOpen, open, onClose, onSaved }: Criter
                         className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={{ backgroundColor: `${cat.color}20`, color: cat.color }}
                       >
-                        {cat.key === 'exam' && 'Pruebas y Quices'}
-                        {cat.key === 'task' && 'Tareas, Trabajos y Proyectos'}
-                        {cat.key === 'participation' && 'Desempeño en clase'}
-                        {cat.key === 'attitude' && 'Convivencia y Valores'}
+                        {cat.key === 'lab' && 'Pruebas de Laboratorio (30 pts)'}
+                        {cat.key === 'project' && 'Diseños y Proyectos Multimedia (25 pts)'}
+                        {cat.key === 'exam' && 'Exámenes Teórico-Prácticos (20 pts)'}
+                        {cat.key === 'exposition' && 'Exposiciones y Sustentación (15 pts)'}
+                        {cat.key === 'attitude' && 'Puntualidad y Actitudinal (10 pts)'}
                       </span>
                     </div>
                     <div className="text-[11px] text-[var(--color-muted)] mt-0.5">
@@ -175,12 +177,12 @@ export function CriteriaSettingsModal({ isOpen, open, onClose, onSaved }: Criter
             )}
             <span>
               {isValidTotal
-                ? 'Distribución equilibrada: Total 100 puntos'
-                : `Total actual: ${currentTotal} / 100 puntos (Diferencia: ${100 - currentTotal > 0 ? `faltan ${100 - currentTotal}` : `sobran ${currentTotal - 100}`} pts)`}
+                ? 'Distribución equilibrada: TOTAL POR RA = 100 pts'
+                : `Total actual: ${currentTotal} / 100 pts (Diferencia: ${100 - currentTotal > 0 ? `faltan ${100 - currentTotal}` : `sobran ${currentTotal - 100}`} pts)`}
             </span>
           </div>
           <span className="text-base font-extrabold tabular-nums">
-            {currentTotal} / 100
+            {currentTotal} / 100 pts
           </span>
         </div>
 
@@ -188,7 +190,7 @@ export function CriteriaSettingsModal({ isOpen, open, onClose, onSaved }: Criter
         <div className="p-3 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[var(--color-muted)] flex items-start gap-2">
           <Info size={16} className="text-[var(--color-primary)] flex-shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <strong>Ejemplo con tu configuración:</strong> Si en {criteriaConfig.exam.name} ({simExams} pts) programas 3 evaluaciones, cada una valdrá <strong>{simPointsPerExam} pts</strong>. Un alumno con 85/100 en un examen aportará exactamente <strong className="text-[var(--color-foreground)]">{simSampleAporte} pts</strong> a su nota del período.
+            <strong>Ejemplo con tu configuración:</strong> Si en {criteriaConfig.lab?.name || 'Pruebas de Laboratorio'} ({simLab} pts) programas 3 actividades, cada una valdrá <strong>{simPointsPerLab} pts</strong>. Un alumno con 85/100 aportará exactamente <strong className="text-[var(--color-foreground)]">{simSampleAporte} pts</strong> a su nota acumulada del RA.
           </p>
         </div>
 
@@ -201,7 +203,7 @@ export function CriteriaSettingsModal({ isOpen, open, onClose, onSaved }: Criter
             onClick={handleReset}
             leftIcon={<RotateCcw size={14} />}
           >
-            Restablecer (30/30/20/20)
+            Restablecer (30/25/20/15/10)
           </Button>
 
           <div className="flex items-center gap-2">

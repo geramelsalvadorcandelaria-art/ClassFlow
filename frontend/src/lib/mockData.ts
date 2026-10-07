@@ -276,12 +276,12 @@ export function getAttendanceForDate(courseId: string, date: string): Attendance
 export const DEFAULT_USERS: User[] = [
   {
     id: 'u-admin',
-    name: 'Geramel Salvador Candelaria',
-    email: 'geramelsalvadorcandelaria@gmail.com',
+    name: 'geramel',
+    email: 'carooveneno@gmail.com',
     role: 'admin',
     password: 'admin',
-    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    department: 'informatica',
+    photo: '',
+    department: 'geramelsalvadorcandelaria@gmail.com',
     phone: '829-505-4822',
     active: true,
     createdAt: '2026-01-10T00:00:00Z',

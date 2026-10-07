@@ -3,7 +3,7 @@
 // ============================================================
 
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'justified';
-export type EvaluationType = 'exam' | 'task' | 'quiz' | 'project' | 'participation' | 'work' | 'other';
+export type EvaluationType = 'lab' | 'project' | 'exam' | 'exposition' | 'attitude' | 'task' | 'quiz' | 'participation' | 'work' | 'other';
 export type StudentStatus = 'active' | 'inactive' | 'withdrawn';
 export type CourseStatus = 'active' | 'completed' | 'draft';
 export type AlertType = 'low_grade' | 'low_attendance' | 'consecutive_absences';

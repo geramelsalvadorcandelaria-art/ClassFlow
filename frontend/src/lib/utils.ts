@@ -15,76 +15,92 @@ export const ACADEMIC_PERIODS: AcademicPeriodInfo[] = [
   { id: 'P4', name: 'Cuarto Período', shortName: 'P4', quarter: 4 },
 ]
 
-// ─── Evaluation Criteria (Ponderaciones manuales configurables) ─────────
-export type CriteriaCategoryKey = 'exam' | 'task' | 'participation' | 'attitude'
+// ─── Evaluation Criteria (Criterios exactos por RA) ─────────
+export type CriteriaCategoryKey = 'lab' | 'project' | 'exam' | 'exposition' | 'attitude'
 
 export interface CriteriaCategoryInfo {
   key: CriteriaCategoryKey
   name: string
+  shortName: string
   weight: number
   types: EvaluationType[]
   color: string
   bg: string
-  badgeVariant: 'danger' | 'success' | 'info' | 'warning'
+  badgeVariant: 'danger' | 'success' | 'info' | 'warning' | 'primary'
 }
 
 export const DEFAULT_CRITERIA_WEIGHTS: Record<CriteriaCategoryKey, number> = {
-  exam: 30,          // 30 puntos
-  task: 30,          // 30 puntos
-  participation: 20,  // 20 puntos
-  attitude: 20,       // 20 puntos
+  lab: 30,         // Pruebas de Laboratorio (30 pts)
+  project: 25,     // Diseños y Proyectos Multimedia (25 pts)
+  exam: 20,        // Exámenes Teórico-Prácticos (20 pts)
+  exposition: 15,  // Exposiciones y Sustentación (15 pts)
+  attitude: 10,    // Puntualidad y Actitudinal (10 pts)
 }
 
 const BASE_CRITERIA_META: Record<CriteriaCategoryKey, Omit<CriteriaCategoryInfo, 'weight'>> = {
+  lab: {
+    key: 'lab',
+    name: 'Pruebas de Laboratorio',
+    shortName: 'Laboratorio',
+    types: ['lab', 'quiz'],
+    color: '#0284C7',
+    bg: '#E0F2FE',
+    badgeVariant: 'info',
+  },
+  project: {
+    key: 'project',
+    name: 'Diseños y Proyectos Multimedia',
+    shortName: 'Proyectos',
+    types: ['project', 'task', 'work'],
+    color: '#7C3AED',
+    bg: '#EDE9FE',
+    badgeVariant: 'primary',
+  },
   exam: {
     key: 'exam',
-    name: 'Exámenes',
-    types: ['exam', 'quiz'],
+    name: 'Exámenes Teórico-Prácticos',
+    shortName: 'Exámenes',
+    types: ['exam'],
     color: '#DC2626',
     bg: '#FEE2E2',
     badgeVariant: 'danger',
   },
-  task: {
-    key: 'task',
-    name: 'Tareas y Trabajos',
-    types: ['task', 'project', 'work'],
-    color: '#16A34A',
-    bg: '#DCFCE7',
+  exposition: {
+    key: 'exposition',
+    name: 'Exposiciones y Sustentación',
+    shortName: 'Exposiciones',
+    types: ['exposition', 'participation'],
+    color: '#059669',
+    bg: '#D1FAE5',
     badgeVariant: 'success',
-  },
-  participation: {
-    key: 'participation',
-    name: 'Participación',
-    types: ['participation'],
-    color: '#2563EB',
-    bg: '#DBEAFE',
-    badgeVariant: 'info',
   },
   attitude: {
     key: 'attitude',
-    name: 'Actitudes y Valores',
-    types: ['other'],
+    name: 'Puntualidad y Actitudinal',
+    shortName: 'Actitudinal',
+    types: ['attitude', 'other'],
     color: '#D97706',
     bg: '#FEF3C7',
     badgeVariant: 'warning',
   },
 }
 
-const CRITERIA_STORAGE_KEY = 'classflow_criteria_weights_v1'
+const CRITERIA_STORAGE_KEY = 'classflow_criteria_weights_v2'
 
 /**
- * Obtiene las ponderaciones configuradas manualmente (o por defecto si no se han personalizado).
+ * Obtiene las ponderaciones configuradas manualmente (o por defecto según el método del docente).
  */
 export function getCriteriaWeights(): Record<CriteriaCategoryKey, number> {
   try {
     const saved = localStorage.getItem(CRITERIA_STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (typeof parsed === 'object' && parsed !== null) {
+      if (typeof parsed === 'object' && parsed !== null && parsed.lab !== undefined) {
         return {
+          lab: Number(parsed.lab ?? DEFAULT_CRITERIA_WEIGHTS.lab),
+          project: Number(parsed.project ?? DEFAULT_CRITERIA_WEIGHTS.project),
           exam: Number(parsed.exam ?? DEFAULT_CRITERIA_WEIGHTS.exam),
-          task: Number(parsed.task ?? DEFAULT_CRITERIA_WEIGHTS.task),
-          participation: Number(parsed.participation ?? DEFAULT_CRITERIA_WEIGHTS.participation),
+          exposition: Number(parsed.exposition ?? DEFAULT_CRITERIA_WEIGHTS.exposition),
           attitude: Number(parsed.attitude ?? DEFAULT_CRITERIA_WEIGHTS.attitude),
         }
       }
@@ -108,7 +124,7 @@ export function saveCriteriaWeights(newWeights: Record<CriteriaCategoryKey, numb
 }
 
 /**
- * Restablece las ponderaciones a los valores iniciales por defecto (30/30/20/20).
+ * Restablece las ponderaciones a los valores iniciales por defecto (30/25/20/15/10).
  */
 export function resetCriteriaWeights(): Record<CriteriaCategoryKey, number> {
   saveCriteriaWeights(DEFAULT_CRITERIA_WEIGHTS)
@@ -164,9 +180,10 @@ export const CRITERIA_CATEGORIES: CriteriaCategoryInfo[] = Object.values(getCrit
  * Returns which evaluation criteria category an evaluation type maps to.
  */
 export function getCriteriaKey(type: EvaluationType): CriteriaCategoryKey {
-  if (type === 'exam' || type === 'quiz') return 'exam'
-  if (type === 'task' || type === 'project' || type === 'work') return 'task'
-  if (type === 'participation') return 'participation'
+  if (type === 'lab' || type === 'quiz') return 'lab'
+  if (type === 'project' || type === 'task' || type === 'work') return 'project'
+  if (type === 'exam') return 'exam'
+  if (type === 'exposition' || type === 'participation') return 'exposition'
   return 'attitude'
 }
 
@@ -543,20 +560,35 @@ export const attendanceLabels: Record<AttendanceStatus, string> = {
 }
 
 export const evaluationTypeLabels: Record<EvaluationType, string> = {
-  exam: 'Examen',
-  task: 'Tarea',
+  lab: 'Prueba de Laboratorio',
+  project: 'Diseño / Proyecto Multimedia',
+  exam: 'Examen Teórico-Práctico',
+  exposition: 'Exposición y Sustentación',
+  attitude: 'Puntualidad y Actitudinal',
+  task: 'Tarea / Asignación',
   quiz: 'Prueba corta',
-  project: 'Proyecto',
   participation: 'Participación',
-  work: 'Trabajo',
-  other: 'Actitudes y Valores',
+  work: 'Trabajo práctico',
+  other: 'Otro / General',
+}
+
+export function getCriteriaFormOptions() {
+  const weights = getCriteriaWeights()
+  return [
+    { value: 'lab', label: `Pruebas de Laboratorio (${weights.lab} pts)` },
+    { value: 'project', label: `Diseños y Proyectos Multimedia (${weights.project} pts)` },
+    { value: 'exam', label: `Exámenes Teórico-Prácticos (${weights.exam} pts)` },
+    { value: 'exposition', label: `Exposiciones y Sustentación (${weights.exposition} pts)` },
+    { value: 'attitude', label: `Puntualidad y Actitudinal (${weights.attitude} pts)` },
+  ]
 }
 
 export const CRITERIA_FORM_OPTIONS = [
-  { value: 'exam', label: 'Examen (Ponderación: 40%)' },
-  { value: 'task', label: 'Tarea / Asignación (Ponderación: 30%)' },
-  { value: 'participation', label: 'Participación (Ponderación: 15%)' },
-  { value: 'other', label: 'Actitudes y Valores (Ponderación: 15%)' },
+  { value: 'lab', label: 'Pruebas de Laboratorio (30 pts)' },
+  { value: 'project', label: 'Diseños y Proyectos Multimedia (25 pts)' },
+  { value: 'exam', label: 'Exámenes Teórico-Prácticos (20 pts)' },
+  { value: 'exposition', label: 'Exposiciones y Sustentación (15 pts)' },
+  { value: 'attitude', label: 'Puntualidad y Actitudinal (10 pts)' },
 ]
 
 export const studentStatusLabels: Record<StudentStatus, string> = {

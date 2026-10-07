@@ -7,7 +7,7 @@ import { useAppStore } from '@/store'
 import { toast } from '@/store'
 import {
   evaluationTypeLabels, formatDate, cn, ACADEMIC_PERIODS,
-  CRITERIA_CONFIG, CRITERIA_FORM_OPTIONS, getCriteriaKey,
+  CRITERIA_CONFIG, CRITERIA_FORM_OPTIONS, getCriteriaFormOptions, getCriteriaKey,
   getEvaluationDynamicWeight, getCriteriaWeights
 } from '@/lib/utils'
 import type { Evaluation, EvaluationType, PeriodId } from '@/types'
@@ -17,7 +17,7 @@ import { z } from 'zod'
 
 const schema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
-  type: z.enum(['exam', 'task', 'quiz', 'project', 'participation', 'work', 'other']),
+  type: z.enum(['lab', 'project', 'exam', 'exposition', 'attitude', 'task', 'quiz', 'participation', 'work', 'other']),
   period: z.enum(['P1', 'P2', 'P3', 'P4']),
   date: z.string().min(1, 'La fecha es requerida'),
   description: z.string().optional(),
@@ -52,7 +52,7 @@ function ExamForm({
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<ExamFormData>({
     resolver: zodResolver(schema) as never,
     defaultValues: {
-      type: 'exam',
+      type: 'lab',
       period: initialPeriod,
       maxScore: 100,
       courseId,
@@ -124,7 +124,7 @@ function ExamForm({
         <div className="col-span-2">
           <label className="block text-xs font-semibold mb-1 text-[var(--color-foreground)]">Criterio de Evaluación</label>
           <select className="form-select text-sm w-full" {...register('type')}>
-            {CRITERIA_FORM_OPTIONS.map((opt) => (
+            {getCriteriaFormOptions().map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
@@ -135,7 +135,13 @@ function ExamForm({
             label="Nombre de la evaluación"
             required
             error={errors.name?.message}
-            placeholder={watchedType === 'exam' ? 'Ej: Examen Parcial 1' : 'Ej: Tarea 1: Ejercicios de Aplicación'}
+            placeholder={
+              watchedType === 'lab' ? 'Ej: Prueba de Laboratorio 1' :
+              watchedType === 'project' ? 'Ej: Diseño / Proyecto Multimedia 1' :
+              watchedType === 'exam' ? 'Ej: Examen Teórico-Práctico 1' :
+              watchedType === 'exposition' ? 'Ej: Exposición y Sustentación 1' :
+              'Ej: Registro de Puntualidad y Actitud 1'
+            }
             {...register('name')}
           />
         </div>
@@ -288,16 +294,16 @@ export default function ExamsPage() {
     <>
       <PageHeader
         title="Exámenes y Evaluaciones"
-        subtitle={`${filtered.length} evaluaciones en total • Criterios activos: ${currentWeights.exam}% Exámenes, ${currentWeights.task}% Tareas, ${currentWeights.participation}% Part., ${currentWeights.attitude}% Actitud`}
+        subtitle={`${filtered.length} evaluaciones en total • Criterios por RA: ${currentWeights.lab} pts Lab., ${currentWeights.project} pts Proyectos, ${currentWeights.exam} pts Exámenes, ${currentWeights.exposition} pts Exposiciones, ${currentWeights.attitude} pts Actitud (Total: 100 pts)`}
         actions={
           <div className="flex gap-2">
             <Button
               variant="secondary"
               leftIcon={<SlidersHorizontal size={15} />}
               onClick={() => setCriteriaModalOpen(true)}
-              title="Ajustar ponderaciones fijas"
+              title="Ajustar ponderaciones fijas por RA"
             >
-              Ponderaciones ({currentWeights.exam}/{currentWeights.task}/{currentWeights.participation}/{currentWeights.attitude})
+              Ponderaciones ({currentWeights.lab}/{currentWeights.project}/{currentWeights.exam}/{currentWeights.exposition}/{currentWeights.attitude})
             </Button>
             <Button leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>
               Nueva evaluación

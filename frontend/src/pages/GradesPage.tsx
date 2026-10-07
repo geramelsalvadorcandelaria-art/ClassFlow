@@ -12,7 +12,7 @@ import { toast } from '@/store'
 import {
   cn, getInitials, getFullName, evaluationTypeLabels,
   getGradeColor, clamp, ACADEMIC_PERIODS, CRITERIA_CONFIG,
-  CRITERIA_CATEGORIES, CRITERIA_FORM_OPTIONS, getCriteriaKey,
+  CRITERIA_CATEGORIES, CRITERIA_FORM_OPTIONS, getCriteriaFormOptions, getCriteriaKey,
   getEvaluationDynamicWeight, calculateStudentPeriodBreakdown,
   calculateStudentAnnualGrades, gradeLevel, gradeLevelLabels,
   getCriteriaWeights, calcularAporteCriterio
@@ -24,7 +24,7 @@ import { z } from 'zod'
 
 const evalSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
-  type: z.enum(['exam', 'task', 'quiz', 'project', 'participation', 'work', 'other']),
+  type: z.enum(['lab', 'project', 'exam', 'exposition', 'attitude', 'task', 'quiz', 'participation', 'work', 'other']),
   period: z.string().min(1),
   date: z.string().min(1, 'La fecha es requerida'),
   description: z.string().optional(),
@@ -173,7 +173,7 @@ function NewEvaluationForm({
         <div>
           <label className="block text-xs font-semibold mb-1 text-[var(--color-foreground)]">Criterio de Evaluación</label>
           <select className="form-select text-sm w-full" {...register('type')}>
-            {CRITERIA_FORM_OPTIONS.map((opt) => (
+            {getCriteriaFormOptions().map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
@@ -185,11 +185,15 @@ function NewEvaluationForm({
             required
             error={errors.name?.message}
             placeholder={
-              watchedType === 'exam'
-                ? `Ej: Examen ${projectedCount}`
-                : watchedType === 'task'
-                ? `Ej: Tarea ${projectedCount}`
-                : 'Ej: Participación en clase'
+              watchedType === 'lab'
+                ? `Ej: Práctica de laboratorio ${projectedCount}`
+                : watchedType === 'project'
+                ? `Ej: Diseño / Proyecto ${projectedCount}`
+                : watchedType === 'exam'
+                ? `Ej: Examen Teórico-Práctico ${projectedCount}`
+                : watchedType === 'exposition'
+                ? `Ej: Exposición y Sustentación ${projectedCount}`
+                : `Ej: Registro de Puntualidad ${projectedCount}`
             }
             {...register('name')}
           />
@@ -228,7 +232,7 @@ export default function GradesPage() {
   const [newPeriodShort, setNewPeriodShort] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
   const [evalToDelete, setEvalToDelete] = useState<Evaluation | null>(null)
-  const [sectionFilter, setSectionFilter] = useState<'all' | 'exam' | 'task' | 'participation' | 'attitude' | 'summary'>('all')
+  const [sectionFilter, setSectionFilter] = useState<'all' | 'lab' | 'project' | 'exam' | 'exposition' | 'attitude' | 'summary'>('all')
 
   // Sincronizar automáticamente el curso seleccionado
   useEffect(() => {
@@ -249,10 +253,11 @@ export default function GradesPage() {
     [allEvaluations, selectedPeriod]
   )
 
-  // Group evaluations by criteria category
+  // Group evaluations by the 5 criteria categories (RA)
+  const labsList = useMemo(() => periodEvaluations.filter((e) => getCriteriaKey(e.type) === 'lab'), [periodEvaluations])
+  const projectsList = useMemo(() => periodEvaluations.filter((e) => getCriteriaKey(e.type) === 'project'), [periodEvaluations])
   const examsList = useMemo(() => periodEvaluations.filter((e) => getCriteriaKey(e.type) === 'exam'), [periodEvaluations])
-  const tasksList = useMemo(() => periodEvaluations.filter((e) => getCriteriaKey(e.type) === 'task'), [periodEvaluations])
-  const partsList = useMemo(() => periodEvaluations.filter((e) => getCriteriaKey(e.type) === 'participation'), [periodEvaluations])
+  const exposList = useMemo(() => periodEvaluations.filter((e) => getCriteriaKey(e.type) === 'exposition'), [periodEvaluations])
   const attsList = useMemo(() => periodEvaluations.filter((e) => getCriteriaKey(e.type) === 'attitude'), [periodEvaluations])
 
   // Auto-select evaluation when period or course changes
@@ -326,20 +331,20 @@ export default function GradesPage() {
     <>
       <PageHeader
         title="Control de Calificaciones y Planilla"
-        subtitle={`${course?.name ?? 'Curso'} • Período: ${selectedPeriod} • Fórmula activa: ${currentWeights.exam}% Exámenes, ${currentWeights.task}% Tareas, ${currentWeights.participation}% Part., ${currentWeights.attitude}% Actitud`}
+        subtitle={`${course?.name ?? 'Curso'} • Período: ${selectedPeriod} • Criterios por RA: ${currentWeights.lab} pts Lab., ${currentWeights.project} pts Proyectos, ${currentWeights.exam} pts Exámenes, ${currentWeights.exposition} pts Exposiciones, ${currentWeights.attitude} pts Actitud (Total: 100 pts)`}
         actions={
           <div className="flex gap-2">
             <Button
               variant="secondary"
               leftIcon={<SlidersHorizontal size={15} />}
               onClick={() => setCriteriaModalOpen(true)}
-              title="Ajustar puntos fijos y fórmula de los criterios"
+              title="Ajustar puntos fijos y fórmula de los criterios por RA"
             >
-              Ponderaciones ({currentWeights.exam}/{currentWeights.task}/{currentWeights.participation}/{currentWeights.attitude})
+              Ponderaciones ({currentWeights.lab}/{currentWeights.project}/{currentWeights.exam}/{currentWeights.exposition}/{currentWeights.attitude})
             </Button>
             <Button
               leftIcon={<Plus size={16} />}
-              onClick={() => { setModalCategoryType('exam'); setNewEvalOpen(true) }}
+              onClick={() => { setModalCategoryType('lab'); setNewEvalOpen(true) }}
             >
               Nueva evaluación
             </Button>
@@ -463,9 +468,105 @@ export default function GradesPage() {
         </div>
       </Card>
 
-      {/* Dynamic Weight Criteria Status Cards for the Period */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {/* Exams Card */}
+      {/* Dynamic Weight Criteria Status Cards for the Period (5 Criterios por RA) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+        {/* 1. Pruebas de Laboratorio Card */}
+        <div
+          className="p-3.5 rounded-xl border transition-all relative overflow-hidden flex flex-col justify-between"
+          style={{
+            backgroundColor: 'var(--color-card)',
+            borderColor: labsList.length > 0 ? '#0284C740' : 'var(--color-border)',
+          }}
+        >
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-[var(--color-foreground)]">Pruebas de Lab.</span>
+              <button
+                type="button"
+                onClick={() => setCriteriaModalOpen(true)}
+                title="Editar ponderación"
+                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 hover:bg-sky-200 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                {currentWeights.lab} pts fijos ✏️
+              </button>
+            </div>
+            <div className="text-sm font-semibold mb-1">
+              {labsList.length > 0 ? (
+                <span className="text-[var(--color-foreground)]">
+                  {labsList.length} {labsList.length === 1 ? 'prueba' : 'pruebas'}
+                </span>
+              ) : (
+                <span className="text-xs text-[var(--color-muted)] font-normal">Sin pruebas creadas</span>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--color-muted)] mb-2">
+              {labsList.length > 0 ? (
+                <span>
+                  Cada una vale <strong className="text-sky-600">{(currentWeights.lab / labsList.length).toFixed(1)} pts</strong> de {selectedPeriod}
+                </span>
+              ) : (
+                <span>Los {currentWeights.lab} puntos se dividirán entre las que agregues</span>
+              )}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleQuickAdd('lab')}
+            className="w-full mt-1 py-1 px-2 rounded text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+          >
+            <Plus size={13} /> + Prueba en {selectedPeriod}
+          </button>
+        </div>
+
+        {/* 2. Diseños y Proyectos Multimedia Card */}
+        <div
+          className="p-3.5 rounded-xl border transition-all relative overflow-hidden flex flex-col justify-between"
+          style={{
+            backgroundColor: 'var(--color-card)',
+            borderColor: projectsList.length > 0 ? '#7C3AED40' : 'var(--color-border)',
+          }}
+        >
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-[var(--color-foreground)]">Proyectos Multimedia</span>
+              <button
+                type="button"
+                onClick={() => setCriteriaModalOpen(true)}
+                title="Editar ponderación"
+                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                {currentWeights.project} pts fijos ✏️
+              </button>
+            </div>
+            <div className="text-sm font-semibold mb-1">
+              {projectsList.length > 0 ? (
+                <span className="text-[var(--color-foreground)]">
+                  {projectsList.length} {projectsList.length === 1 ? 'proyecto' : 'proyectos'}
+                </span>
+              ) : (
+                <span className="text-xs text-[var(--color-muted)] font-normal">Sin proyectos</span>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--color-muted)] mb-2">
+              {projectsList.length > 0 ? (
+                <span>
+                  Cada uno vale <strong className="text-purple-600">{(currentWeights.project / projectsList.length).toFixed(1)} pts</strong> de {selectedPeriod}
+                </span>
+              ) : (
+                <span>Los {currentWeights.project} puntos se dividirán entre los que agregues</span>
+              )}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleQuickAdd('project')}
+            className="w-full mt-1 py-1 px-2 rounded text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+          >
+            <Plus size={13} /> + Proyecto en {selectedPeriod}
+          </button>
+        </div>
+
+        {/* 3. Exámenes Teórico-Prácticos Card */}
         <div
           className="p-3.5 rounded-xl border transition-all relative overflow-hidden flex flex-col justify-between"
           style={{
@@ -475,7 +576,7 @@ export default function GradesPage() {
         >
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-[var(--color-foreground)]">Exámenes</span>
+              <span className="text-xs font-bold text-[var(--color-foreground)]">Exám. Teórico-Práct.</span>
               <button
                 type="button"
                 onClick={() => setCriteriaModalOpen(true)}
@@ -513,103 +614,55 @@ export default function GradesPage() {
           </button>
         </div>
 
-        {/* Tasks Card */}
+        {/* 4. Exposiciones y Sustentación Card */}
         <div
           className="p-3.5 rounded-xl border transition-all relative overflow-hidden flex flex-col justify-between"
           style={{
             backgroundColor: 'var(--color-card)',
-            borderColor: tasksList.length > 0 ? '#16A34A40' : 'var(--color-border)',
+            borderColor: exposList.length > 0 ? '#05966940' : 'var(--color-border)',
           }}
         >
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-[var(--color-foreground)]">Tareas</span>
+              <span className="text-xs font-bold text-[var(--color-foreground)]">Exposiciones</span>
               <button
                 type="button"
                 onClick={() => setCriteriaModalOpen(true)}
                 title="Editar ponderación"
-                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors flex items-center gap-1 cursor-pointer"
+                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors flex items-center gap-1 cursor-pointer"
               >
-                {currentWeights.task} pts fijos ✏️
+                {currentWeights.exposition} pts fijos ✏️
               </button>
             </div>
             <div className="text-sm font-semibold mb-1">
-              {tasksList.length > 0 ? (
+              {exposList.length > 0 ? (
                 <span className="text-[var(--color-foreground)]">
-                  {tasksList.length} {tasksList.length === 1 ? 'tarea' : 'tareas'}
+                  {exposList.length} {exposList.length === 1 ? 'exposición' : 'exposiciones'}
                 </span>
               ) : (
-                <span className="text-xs text-[var(--color-muted)] font-normal">Sin tareas creadas</span>
+                <span className="text-xs text-[var(--color-muted)] font-normal">Sin exposiciones</span>
               )}
             </div>
             <p className="text-[11px] text-[var(--color-muted)] mb-2">
-              {tasksList.length > 0 ? (
+              {exposList.length > 0 ? (
                 <span>
-                  Cada tarea vale <strong className="text-green-600">{(currentWeights.task / tasksList.length).toFixed(1)} pts</strong> de {selectedPeriod}
+                  Cada una vale <strong className="text-emerald-600">{(currentWeights.exposition / exposList.length).toFixed(1)} pts</strong> de {selectedPeriod}
                 </span>
               ) : (
-                <span>Los {currentWeights.task} puntos se dividirán entre las que agregues</span>
+                <span>Los {currentWeights.exposition} puntos se dividirán entre las que agregues</span>
               )}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => handleQuickAdd('task')}
-            className="w-full mt-1 py-1 px-2 rounded text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+            onClick={() => handleQuickAdd('exposition')}
+            className="w-full mt-1 py-1 px-2 rounded text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
           >
-            <Plus size={13} /> + Tarea en {selectedPeriod}
+            <Plus size={13} /> + Exposición en {selectedPeriod}
           </button>
         </div>
 
-        {/* Participation Card */}
-        <div
-          className="p-3.5 rounded-xl border transition-all relative overflow-hidden flex flex-col justify-between"
-          style={{
-            backgroundColor: 'var(--color-card)',
-            borderColor: partsList.length > 0 ? '#2563EB40' : 'var(--color-border)',
-          }}
-        >
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-[var(--color-foreground)]">Participación</span>
-              <button
-                type="button"
-                onClick={() => setCriteriaModalOpen(true)}
-                title="Editar ponderación"
-                className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                {currentWeights.participation} pts fijos ✏️
-              </button>
-            </div>
-            <div className="text-sm font-semibold mb-1">
-              {partsList.length > 0 ? (
-                <span className="text-[var(--color-foreground)]">
-                  {partsList.length} {partsList.length === 1 ? 'actividad' : 'actividades'}
-                </span>
-              ) : (
-                <span className="text-xs text-[var(--color-muted)] font-normal">Sin registros</span>
-              )}
-            </div>
-            <p className="text-[11px] text-[var(--color-muted)] mb-2">
-              {partsList.length > 0 ? (
-                <span>
-                  Cada una vale <strong className="text-blue-600">{(currentWeights.participation / partsList.length).toFixed(1)} pts</strong> de {selectedPeriod}
-                </span>
-              ) : (
-                <span>Los {currentWeights.participation} puntos se dividirán automáticamente</span>
-              )}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleQuickAdd('participation')}
-            className="w-full mt-1 py-1 px-2 rounded text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-          >
-            <Plus size={13} /> + Participación en {selectedPeriod}
-          </button>
-        </div>
-
-        {/* Attitude Card */}
+        {/* 5. Puntualidad y Actitudinal Card */}
         <div
           className="p-3.5 rounded-xl border transition-all relative overflow-hidden flex flex-col justify-between"
           style={{
@@ -619,7 +672,7 @@ export default function GradesPage() {
         >
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-[var(--color-foreground)]">Actitudes y Valores</span>
+              <span className="text-xs font-bold text-[var(--color-foreground)]">Puntualidad y Actitud</span>
               <button
                 type="button"
                 onClick={() => setCriteriaModalOpen(true)}
@@ -632,7 +685,7 @@ export default function GradesPage() {
             <div className="text-sm font-semibold mb-1">
               {attsList.length > 0 ? (
                 <span className="text-[var(--color-foreground)]">
-                  {attsList.length} {attsList.length === 1 ? 'evaluación' : 'evaluaciones'}
+                  {attsList.length} {attsList.length === 1 ? 'registro' : 'registros'}
                 </span>
               ) : (
                 <span className="text-xs text-[var(--color-muted)] font-normal">Sin registros</span>
@@ -641,7 +694,7 @@ export default function GradesPage() {
             <p className="text-[11px] text-[var(--color-muted)] mb-2">
               {attsList.length > 0 ? (
                 <span>
-                  Cada una vale <strong className="text-amber-600">{(currentWeights.attitude / attsList.length).toFixed(1)} pts</strong> de {selectedPeriod}
+                  Cada uno vale <strong className="text-amber-600">{(currentWeights.attitude / attsList.length).toFixed(1)} pts</strong> de {selectedPeriod}
                 </span>
               ) : (
                 <span>Los {currentWeights.attitude} puntos se dividirán automáticamente</span>
@@ -650,7 +703,7 @@ export default function GradesPage() {
           </div>
           <button
             type="button"
-            onClick={() => handleQuickAdd('other')}
+            onClick={() => handleQuickAdd('attitude')}
             className="w-full mt-1 py-1 px-2 rounded text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
           >
             <Plus size={13} /> + Actitud en {selectedPeriod}
@@ -686,10 +739,11 @@ export default function GradesPage() {
                 aria-label="Buscar o filtrar por sección"
               >
                 <option value="all">🔍 Todas las secciones (Sábana completa)</option>
-                <option value="exam">📝 Sección: Exámenes (40% • {examsList.length} col)</option>
-                <option value="task">📚 Sección: Tareas (30% • {tasksList.length} col)</option>
-                <option value="participation">🙋 Sección: Participación (15% • {partsList.length} col)</option>
-                <option value="attitude">⭐ Sección: Actitudes y Valores (15% • {attsList.length} col)</option>
+                <option value="lab">🧪 Pruebas de Laboratorio ({currentWeights.lab}% • {labsList.length} col)</option>
+                <option value="project">🎨 Diseños y Proyectos Multimedia ({currentWeights.project}% • {projectsList.length} col)</option>
+                <option value="exam">📝 Exámenes Teórico-Prácticos ({currentWeights.exam}% • {examsList.length} col)</option>
+                <option value="exposition">🗣️ Exposiciones y Sustentación ({currentWeights.exposition}% • {exposList.length} col)</option>
+                <option value="attitude">⭐ Puntualidad y Actitudinal ({currentWeights.attitude}% • {attsList.length} col)</option>
                 <option value="summary">📊 Sección: Resumen y Nota Final (Subtotales)</option>
               </select>
             </div>
@@ -714,6 +768,38 @@ export default function GradesPage() {
 
             <button
               type="button"
+              onClick={() => setSectionFilter('lab')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
+                sectionFilter === 'lab'
+                  ? 'bg-sky-600 text-white shadow-xs font-semibold'
+                  : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200/50'
+              )}
+            >
+              <span>🧪 Lab ({currentWeights.lab}%)</span>
+              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'lab' ? 'bg-white/20' : 'bg-sky-200/60')}>
+                {labsList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSectionFilter('project')}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
+                sectionFilter === 'project'
+                  ? 'bg-purple-600 text-white shadow-xs font-semibold'
+                  : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200/50'
+              )}
+            >
+              <span>🎨 Proyectos ({currentWeights.project}%)</span>
+              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'project' ? 'bg-white/20' : 'bg-purple-200/60')}>
+                {projectsList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setSectionFilter('exam')}
               className={cn(
                 'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
@@ -722,7 +808,7 @@ export default function GradesPage() {
                   : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200/50'
               )}
             >
-              <span>📝 Exámenes (40%)</span>
+              <span>📝 Exámenes ({currentWeights.exam}%)</span>
               <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'exam' ? 'bg-white/20' : 'bg-red-200/60')}>
                 {examsList.length}
               </span>
@@ -730,33 +816,17 @@ export default function GradesPage() {
 
             <button
               type="button"
-              onClick={() => setSectionFilter('task')}
+              onClick={() => setSectionFilter('exposition')}
               className={cn(
                 'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
-                sectionFilter === 'task'
-                  ? 'bg-green-600 text-white shadow-xs font-semibold'
-                  : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200/50'
+                sectionFilter === 'exposition'
+                  ? 'bg-emerald-600 text-white shadow-xs font-semibold'
+                  : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/50'
               )}
             >
-              <span>📚 Tareas (30%)</span>
-              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'task' ? 'bg-white/20' : 'bg-green-200/60')}>
-                {tasksList.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSectionFilter('participation')}
-              className={cn(
-                'px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
-                sectionFilter === 'participation'
-                  ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/50'
-              )}
-            >
-              <span>🙋 Participación (15%)</span>
-              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'participation' ? 'bg-white/20' : 'bg-blue-200/60')}>
-                {partsList.length}
+              <span>🗣️ Exposiciones ({currentWeights.exposition}%)</span>
+              <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'exposition' ? 'bg-white/20' : 'bg-emerald-200/60')}>
+                {exposList.length}
               </span>
             </button>
 
@@ -770,7 +840,7 @@ export default function GradesPage() {
                   : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/50'
               )}
             >
-              <span>⭐ Actitudes (15%)</span>
+              <span>⭐ Actitud ({currentWeights.attitude}%)</span>
               <span className={cn('text-[10px] font-bold px-1.5 py-0.2 rounded-full', sectionFilter === 'attitude' ? 'bg-white/20' : 'bg-amber-200/60')}>
                 {attsList.length}
               </span>
@@ -795,12 +865,15 @@ export default function GradesPage() {
               <p className="text-sm font-semibold text-[var(--color-muted)] mb-3">
                 No hay actividades registradas en el {selectedPeriod}.
               </p>
-              <div className="flex justify-center gap-2">
-                <Button size="sm" onClick={() => handleQuickAdd('exam')} leftIcon={<Plus size={14} />}>
-                  Crear primer examen
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button size="sm" onClick={() => handleQuickAdd('lab')} leftIcon={<Plus size={14} />}>
+                  + Prueba de Lab ({currentWeights.lab} pts)
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => handleQuickAdd('task')} leftIcon={<Plus size={14} />}>
-                  Crear primera tarea
+                <Button size="sm" variant="secondary" onClick={() => handleQuickAdd('project')} leftIcon={<Plus size={14} />}>
+                  + Proyecto ({currentWeights.project} pts)
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => handleQuickAdd('exam')} leftIcon={<Plus size={14} />}>
+                  + Examen ({currentWeights.exam} pts)
                 </Button>
               </div>
             </div>
@@ -808,13 +881,13 @@ export default function GradesPage() {
             <div className="table-wrapper overflow-x-auto">
               <table className="table table-bordered text-xs w-full">
                 <thead>
-                  {/* VIEW: RESUMEN / TOTALES (No horizontal scrolling!) */}
+                  {/* VIEW: RESUMEN / TOTALES */}
                   {sectionFilter === 'summary' ? (
                     <>
                       <tr className="bg-[var(--color-bg-secondary)] text-center font-bold">
                         <th colSpan={2} className="text-left bg-[var(--color-card)] sticky left-0 z-20">Estudiante</th>
-                        <th colSpan={4} className="bg-indigo-50 text-indigo-900 border-x border-indigo-200 py-1.5">
-                          Desglose por Secciones de Evaluación ({selectedPeriod})
+                        <th colSpan={5} className="bg-indigo-50 text-indigo-900 border-x border-indigo-200 py-1.5">
+                          Desglose por Criterios de Evaluación ({selectedPeriod})
                         </th>
                         <th colSpan={2} className="bg-blue-600 text-white py-1.5">
                           Calificación Definitiva {selectedPeriod}
@@ -823,10 +896,11 @@ export default function GradesPage() {
                       <tr className="bg-[var(--color-card)] text-center text-[11px]">
                         <th className="text-left min-w-[170px] sticky left-0 z-20 bg-[var(--color-card)]">Nombre</th>
                         <th className="hidden sm:table-cell text-left min-w-[90px] text-[var(--color-muted)]">Matrícula</th>
-                        <th className="bg-red-50 text-red-800 font-bold min-w-[100px]">📝 Exámenes (40 pts)</th>
-                        <th className="bg-green-50 text-green-800 font-bold min-w-[100px]">📚 Tareas (30 pts)</th>
-                        <th className="bg-blue-50 text-blue-800 font-bold min-w-[100px]">🙋 Part. (15 pts)</th>
-                        <th className="bg-amber-50 text-amber-800 font-bold min-w-[100px]">⭐ Actitud (15 pts)</th>
+                        <th className="bg-sky-50 text-sky-800 font-bold min-w-[100px]">🧪 Lab ({currentWeights.lab} pts)</th>
+                        <th className="bg-purple-50 text-purple-800 font-bold min-w-[100px]">🎨 Proyectos ({currentWeights.project} pts)</th>
+                        <th className="bg-red-50 text-red-800 font-bold min-w-[100px]">📝 Exámenes ({currentWeights.exam} pts)</th>
+                        <th className="bg-emerald-50 text-emerald-800 font-bold min-w-[100px]">🗣️ Exposiciones ({currentWeights.exposition} pts)</th>
+                        <th className="bg-amber-50 text-amber-800 font-bold min-w-[100px]">⭐ Actitud ({currentWeights.attitude} pts)</th>
                         <th className="bg-blue-100 font-black text-blue-900 min-w-[110px]">TOTAL {selectedPeriod} (100)</th>
                         <th className="min-w-[90px]">Nivel</th>
                       </tr>
@@ -837,6 +911,44 @@ export default function GradesPage() {
                       <tr className="bg-[var(--color-bg-secondary)] text-center font-bold">
                         <th colSpan={2} className="text-left bg-[var(--color-card)] sticky left-0 z-20">Estudiante</th>
 
+                        {/* Lab Group */}
+                        {(sectionFilter === 'all' || sectionFilter === 'lab') && labsList.length > 0 && (
+                          <th
+                            colSpan={labsList.length + 1}
+                            className="bg-sky-50 text-sky-800 border-x border-sky-200 py-1.5"
+                          >
+                            <div className="flex items-center justify-between px-2">
+                              <span>LABORATORIO ({currentWeights.lab}% Total • {(currentWeights.lab / labsList.length).toFixed(1)}% c/u)</span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAdd('lab')}
+                                className="text-[11px] px-2 py-0.5 rounded bg-sky-600 text-white font-semibold hover:bg-sky-700 transition cursor-pointer"
+                              >
+                                + Prueba
+                              </button>
+                            </div>
+                          </th>
+                        )}
+
+                        {/* Projects Group */}
+                        {(sectionFilter === 'all' || sectionFilter === 'project') && projectsList.length > 0 && (
+                          <th
+                            colSpan={projectsList.length + 1}
+                            className="bg-purple-50 text-purple-800 border-x border-purple-200 py-1.5"
+                          >
+                            <div className="flex items-center justify-between px-2">
+                              <span>PROYECTOS MULTIMEDIA ({currentWeights.project}% Total • {(currentWeights.project / projectsList.length).toFixed(1)}% c/u)</span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAdd('project')}
+                                className="text-[11px] px-2 py-0.5 rounded bg-purple-600 text-white font-semibold hover:bg-purple-700 transition cursor-pointer"
+                              >
+                                + Proyecto
+                              </button>
+                            </div>
+                          </th>
+                        )}
+
                         {/* Exams Group */}
                         {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.length > 0 && (
                           <th
@@ -844,7 +956,7 @@ export default function GradesPage() {
                             className="bg-red-50 text-red-800 border-x border-red-200 py-1.5"
                           >
                             <div className="flex items-center justify-between px-2">
-                              <span>EXÁMENES (40% Total • {(40 / examsList.length).toFixed(1)}% c/u)</span>
+                              <span>EXÁMENES ({currentWeights.exam}% Total • {(currentWeights.exam / examsList.length).toFixed(1)}% c/u)</span>
                               <button
                                 type="button"
                                 onClick={() => handleQuickAdd('exam')}
@@ -856,39 +968,20 @@ export default function GradesPage() {
                           </th>
                         )}
 
-                        {/* Tasks Group */}
-                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.length > 0 && (
+                        {/* Expos Group */}
+                        {(sectionFilter === 'all' || sectionFilter === 'exposition') && exposList.length > 0 && (
                           <th
-                            colSpan={tasksList.length + 1}
-                            className="bg-green-50 text-green-800 border-x border-green-200 py-1.5"
+                            colSpan={exposList.length + 1}
+                            className="bg-emerald-50 text-emerald-800 border-x border-emerald-200 py-1.5"
                           >
                             <div className="flex items-center justify-between px-2">
-                              <span>TAREAS (30% Total • {(30 / tasksList.length).toFixed(1)}% c/u)</span>
+                              <span>EXPOSICIONES ({currentWeights.exposition}% Total • {(currentWeights.exposition / exposList.length).toFixed(1)}% c/u)</span>
                               <button
                                 type="button"
-                                onClick={() => handleQuickAdd('task')}
-                                className="text-[11px] px-2 py-0.5 rounded bg-green-600 text-white font-semibold hover:bg-green-700 transition cursor-pointer"
+                                onClick={() => handleQuickAdd('exposition')}
+                                className="text-[11px] px-2 py-0.5 rounded bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition cursor-pointer"
                               >
-                                + Tarea
-                              </button>
-                            </div>
-                          </th>
-                        )}
-
-                        {/* Participation Group */}
-                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.length > 0 && (
-                          <th
-                            colSpan={partsList.length + 1}
-                            className="bg-blue-50 text-blue-800 border-x border-blue-200 py-1.5"
-                          >
-                            <div className="flex items-center justify-between px-2">
-                              <span>PARTICIPACIÓN (15% Total • {(15 / partsList.length).toFixed(1)}% c/u)</span>
-                              <button
-                                type="button"
-                                onClick={() => handleQuickAdd('participation')}
-                                className="text-[11px] px-2 py-0.5 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition cursor-pointer"
-                              >
-                                + Part.
+                                + Exposición
                               </button>
                             </div>
                           </th>
@@ -901,10 +994,10 @@ export default function GradesPage() {
                             className="bg-amber-50 text-amber-800 border-x border-amber-200 py-1.5"
                           >
                             <div className="flex items-center justify-between px-2">
-                              <span>ACTITUDES (15% Total • {(15 / attsList.length).toFixed(1)}% c/u)</span>
+                              <span>ACTITUDINAL ({currentWeights.attitude}% Total • {(currentWeights.attitude / attsList.length).toFixed(1)}% c/u)</span>
                               <button
                                 type="button"
-                                onClick={() => handleQuickAdd('other')}
+                                onClick={() => handleQuickAdd('attitude')}
                                 className="text-[11px] px-2 py-0.5 rounded bg-amber-600 text-white font-semibold hover:bg-amber-700 transition cursor-pointer"
                               >
                                 + Actitud
@@ -913,23 +1006,66 @@ export default function GradesPage() {
                           </th>
                         )}
 
-                        {sectionFilter === 'all' ? (
-                          <th rowSpan={2} className="text-center font-black bg-blue-600 text-white text-xs align-middle">
-                            NOTA {selectedPeriod}
-                            <span className="block text-[10px] font-normal opacity-90">(100 pts)</span>
-                          </th>
-                        ) : (
-                          <th rowSpan={2} className="text-center font-black bg-blue-600 text-white text-xs align-middle">
-                            NOTA FINAL
-                            <span className="block text-[10px] font-normal opacity-90">({selectedPeriod})</span>
-                          </th>
-                        )}
+                        <th rowSpan={2} className="text-center font-black bg-blue-600 text-white text-xs align-middle">
+                          NOTA {selectedPeriod}
+                          <span className="block text-[10px] font-normal opacity-90">(100 pts)</span>
+                        </th>
                       </tr>
 
                       {/* Tier 2 Header: Individual Activity Columns */}
                       <tr className="bg-[var(--color-card)] text-center text-[11px]">
                         <th className="text-left min-w-[170px] sticky left-0 z-20 bg-[var(--color-card)]">Nombre</th>
                         <th className="hidden sm:table-cell text-left min-w-[90px] text-[var(--color-muted)]">Matrícula</th>
+
+                        {/* Lab Columns */}
+                        {(sectionFilter === 'all' || sectionFilter === 'lab') && labsList.map((ev) => (
+                          <th key={ev.id} className="min-w-[80px] p-2 bg-sky-50/40">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEval(ev)}
+                                className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                                title="Eliminar prueba"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                            <span className="text-[10px] text-sky-600 block font-semibold">
+                              {(currentWeights.lab / labsList.length).toFixed(1)}%
+                            </span>
+                          </th>
+                        ))}
+                        {(sectionFilter === 'all' || sectionFilter === 'lab') && labsList.length > 0 && (
+                          <th className="min-w-[70px] bg-sky-100/70 font-bold text-sky-800 border-r border-sky-200">
+                            Subt.({currentWeights.lab})
+                          </th>
+                        )}
+
+                        {/* Project Columns */}
+                        {(sectionFilter === 'all' || sectionFilter === 'project') && projectsList.map((ev) => (
+                          <th key={ev.id} className="min-w-[80px] p-2 bg-purple-50/40">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEval(ev)}
+                                className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                                title="Eliminar proyecto"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                            <span className="text-[10px] text-purple-600 block font-semibold">
+                              {(currentWeights.project / projectsList.length).toFixed(1)}%
+                            </span>
+                          </th>
+                        ))}
+                        {(sectionFilter === 'all' || sectionFilter === 'project') && projectsList.length > 0 && (
+                          <th className="min-w-[70px] bg-purple-100/70 font-bold text-purple-800 border-r border-purple-200">
+                            Subt.({currentWeights.project})
+                          </th>
+                        )}
 
                         {/* Exam Columns */}
                         {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.map((ev) => (
@@ -946,63 +1082,38 @@ export default function GradesPage() {
                               </button>
                             </div>
                             <span className="text-[10px] text-red-600 block font-semibold">
-                              {(40 / examsList.length).toFixed(1)}%
+                              {(currentWeights.exam / examsList.length).toFixed(1)}%
                             </span>
                           </th>
                         ))}
                         {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.length > 0 && (
                           <th className="min-w-[70px] bg-red-100/70 font-bold text-red-800 border-r border-red-200">
-                            Subt.(40)
+                            Subt.({currentWeights.exam})
                           </th>
                         )}
 
-                        {/* Task Columns */}
-                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.map((ev) => (
-                          <th key={ev.id} className="min-w-[80px] p-2 bg-green-50/40">
+                        {/* Exposition Columns */}
+                        {(sectionFilter === 'all' || sectionFilter === 'exposition') && exposList.map((ev) => (
+                          <th key={ev.id} className="min-w-[80px] p-2 bg-emerald-50/40">
                             <div className="flex items-center justify-between gap-1">
                               <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteEval(ev)}
                                 className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
-                                title="Eliminar tarea"
+                                title="Eliminar exposición"
                               >
                                 <X size={11} />
                               </button>
                             </div>
-                            <span className="text-[10px] text-green-600 block font-semibold">
-                              {(30 / tasksList.length).toFixed(1)}%
+                            <span className="text-[10px] text-emerald-600 block font-semibold">
+                              {(currentWeights.exposition / exposList.length).toFixed(1)}%
                             </span>
                           </th>
                         ))}
-                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.length > 0 && (
-                          <th className="min-w-[70px] bg-green-100/70 font-bold text-green-800 border-r border-green-200">
-                            Subt.(30)
-                          </th>
-                        )}
-
-                        {/* Participation Columns */}
-                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.map((ev) => (
-                          <th key={ev.id} className="min-w-[80px] p-2 bg-blue-50/40">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="font-bold truncate" title={ev.name}>{ev.name}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteEval(ev)}
-                                className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
-                                title="Eliminar"
-                              >
-                                <X size={11} />
-                              </button>
-                            </div>
-                            <span className="text-[10px] text-blue-600 block font-semibold">
-                              {(15 / partsList.length).toFixed(1)}%
-                            </span>
-                          </th>
-                        ))}
-                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.length > 0 && (
-                          <th className="min-w-[70px] bg-blue-100/70 font-bold text-blue-800 border-r border-blue-200">
-                            Subt.(15)
+                        {(sectionFilter === 'all' || sectionFilter === 'exposition') && exposList.length > 0 && (
+                          <th className="min-w-[70px] bg-emerald-100/70 font-bold text-emerald-800 border-r border-emerald-200">
+                            Subt.({currentWeights.exposition})
                           </th>
                         )}
 
@@ -1015,19 +1126,19 @@ export default function GradesPage() {
                                 type="button"
                                 onClick={() => handleDeleteEval(ev)}
                                 className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
-                                title="Eliminar"
+                                title="Eliminar registro"
                               >
                                 <X size={11} />
                               </button>
                             </div>
                             <span className="text-[10px] text-amber-600 block font-semibold">
-                              {(15 / attsList.length).toFixed(1)}%
+                              {(currentWeights.attitude / attsList.length).toFixed(1)}%
                             </span>
                           </th>
                         ))}
                         {(sectionFilter === 'all' || sectionFilter === 'attitude') && attsList.length > 0 && (
                           <th className="min-w-[70px] bg-amber-100/70 font-bold text-amber-800 border-r border-amber-200">
-                            Subt.(15)
+                            Subt.({currentWeights.attitude})
                           </th>
                         )}
                       </tr>
@@ -1058,17 +1169,20 @@ export default function GradesPage() {
                           <td className="hidden sm:table-cell text-xs text-[var(--color-muted)] font-mono">
                             {student.studentId}
                           </td>
+                          <td className="text-center font-bold text-xs bg-sky-50/30 text-sky-800">
+                            {breakdown.categories.lab?.pointsEarned.toFixed(1) ?? '0.0'} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ {currentWeights.lab}</span>
+                          </td>
+                          <td className="text-center font-bold text-xs bg-purple-50/30 text-purple-800">
+                            {breakdown.categories.project?.pointsEarned.toFixed(1) ?? '0.0'} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ {currentWeights.project}</span>
+                          </td>
                           <td className="text-center font-bold text-xs bg-red-50/30 text-red-700">
-                            {breakdown.categories.exam.pointsEarned.toFixed(1)} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ 40</span>
+                            {breakdown.categories.exam?.pointsEarned.toFixed(1) ?? '0.0'} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ {currentWeights.exam}</span>
                           </td>
-                          <td className="text-center font-bold text-xs bg-green-50/30 text-green-700">
-                            {breakdown.categories.task.pointsEarned.toFixed(1)} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ 30</span>
-                          </td>
-                          <td className="text-center font-bold text-xs bg-blue-50/30 text-blue-700">
-                            {breakdown.categories.participation.pointsEarned.toFixed(1)} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ 15</span>
+                          <td className="text-center font-bold text-xs bg-emerald-50/30 text-emerald-800">
+                            {breakdown.categories.exposition?.pointsEarned.toFixed(1) ?? '0.0'} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ {currentWeights.exposition}</span>
                           </td>
                           <td className="text-center font-bold text-xs bg-amber-50/30 text-amber-700">
-                            {breakdown.categories.attitude.pointsEarned.toFixed(1)} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ 15</span>
+                            {breakdown.categories.attitude?.pointsEarned.toFixed(1) ?? '0.0'} <span className="text-[10px] text-[var(--color-muted)] font-normal">/ {currentWeights.attitude}</span>
                           </td>
                           <td className="text-center font-black text-sm bg-blue-50/80">
                             {breakdown.hasGrades ? (
@@ -1105,6 +1219,38 @@ export default function GradesPage() {
                           {student.studentId}
                         </td>
 
+                        {/* Lab Cells */}
+                        {(sectionFilter === 'all' || sectionFilter === 'lab') && labsList.map((ev) => (
+                          <td key={ev.id} className="text-center p-1.5 bg-sky-50/20">
+                            <MatrixGradeCell
+                              score={gradeMap.get(ev.id)}
+                              maxScore={ev.maxScore}
+                              onSave={(val) => handleUpdateGrade(student.id, ev.id, val)}
+                            />
+                          </td>
+                        ))}
+                        {(sectionFilter === 'all' || sectionFilter === 'lab') && labsList.length > 0 && (
+                          <td className="text-center font-bold text-xs bg-sky-100/40 text-sky-800 border-r border-sky-200">
+                            {breakdown.categories.lab?.pointsEarned.toFixed(1) ?? '0.0'}
+                          </td>
+                        )}
+
+                        {/* Project Cells */}
+                        {(sectionFilter === 'all' || sectionFilter === 'project') && projectsList.map((ev) => (
+                          <td key={ev.id} className="text-center p-1.5 bg-purple-50/20">
+                            <MatrixGradeCell
+                              score={gradeMap.get(ev.id)}
+                              maxScore={ev.maxScore}
+                              onSave={(val) => handleUpdateGrade(student.id, ev.id, val)}
+                            />
+                          </td>
+                        ))}
+                        {(sectionFilter === 'all' || sectionFilter === 'project') && projectsList.length > 0 && (
+                          <td className="text-center font-bold text-xs bg-purple-100/40 text-purple-800 border-r border-purple-200">
+                            {breakdown.categories.project?.pointsEarned.toFixed(1) ?? '0.0'}
+                          </td>
+                        )}
+
                         {/* Exam Cells */}
                         {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.map((ev) => (
                           <td key={ev.id} className="text-center p-1.5 bg-red-50/20">
@@ -1117,13 +1263,13 @@ export default function GradesPage() {
                         ))}
                         {(sectionFilter === 'all' || sectionFilter === 'exam') && examsList.length > 0 && (
                           <td className="text-center font-bold text-xs bg-red-100/40 text-red-700 border-r border-red-200">
-                            {breakdown.categories.exam.pointsEarned.toFixed(1)}
+                            {breakdown.categories.exam?.pointsEarned.toFixed(1) ?? '0.0'}
                           </td>
                         )}
 
-                        {/* Task Cells */}
-                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.map((ev) => (
-                          <td key={ev.id} className="text-center p-1.5 bg-green-50/20">
+                        {/* Exposition Cells */}
+                        {(sectionFilter === 'all' || sectionFilter === 'exposition') && exposList.map((ev) => (
+                          <td key={ev.id} className="text-center p-1.5 bg-emerald-50/20">
                             <MatrixGradeCell
                               score={gradeMap.get(ev.id)}
                               maxScore={ev.maxScore}
@@ -1131,25 +1277,9 @@ export default function GradesPage() {
                             />
                           </td>
                         ))}
-                        {(sectionFilter === 'all' || sectionFilter === 'task') && tasksList.length > 0 && (
-                          <td className="text-center font-bold text-xs bg-green-100/40 text-green-700 border-r border-green-200">
-                            {breakdown.categories.task.pointsEarned.toFixed(1)}
-                          </td>
-                        )}
-
-                        {/* Participation Cells */}
-                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.map((ev) => (
-                          <td key={ev.id} className="text-center p-1.5 bg-blue-50/20">
-                            <MatrixGradeCell
-                              score={gradeMap.get(ev.id)}
-                              maxScore={ev.maxScore}
-                              onSave={(val) => handleUpdateGrade(student.id, ev.id, val)}
-                            />
-                          </td>
-                        ))}
-                        {(sectionFilter === 'all' || sectionFilter === 'participation') && partsList.length > 0 && (
-                          <td className="text-center font-bold text-xs bg-blue-100/40 text-blue-700 border-r border-blue-200">
-                            {breakdown.categories.participation.pointsEarned.toFixed(1)}
+                        {(sectionFilter === 'all' || sectionFilter === 'exposition') && exposList.length > 0 && (
+                          <td className="text-center font-bold text-xs bg-emerald-100/40 text-emerald-800 border-r border-emerald-200">
+                            {breakdown.categories.exposition?.pointsEarned.toFixed(1) ?? '0.0'}
                           </td>
                         )}
 
@@ -1165,7 +1295,7 @@ export default function GradesPage() {
                         ))}
                         {(sectionFilter === 'all' || sectionFilter === 'attitude') && attsList.length > 0 && (
                           <td className="text-center font-bold text-xs bg-amber-100/40 text-amber-700 border-r border-amber-200">
-                            {breakdown.categories.attitude.pointsEarned.toFixed(1)}
+                            {breakdown.categories.attitude?.pointsEarned.toFixed(1) ?? '0.0'}
                           </td>
                         )}
 
@@ -1195,7 +1325,7 @@ export default function GradesPage() {
           <div className="p-4 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
             <h3 className="font-bold text-sm">Resumen Oficial por Criterios • {selectedPeriod}</h3>
             <p className="text-xs text-[var(--color-muted)] mt-0.5">
-              Exámenes (40%) + Tareas (30%) + Participación (15%) + Actitudes (15%) = 100%
+              Pruebas Lab ({currentWeights.lab} pts) + Proyectos ({currentWeights.project} pts) + Exámenes ({currentWeights.exam} pts) + Exposiciones ({currentWeights.exposition} pts) + Actitud ({currentWeights.attitude} pts) = 100 pts
             </p>
           </div>
           <div className="table-wrapper">
@@ -1204,10 +1334,11 @@ export default function GradesPage() {
                 <tr>
                   <th>Estudiante</th>
                   <th className="hidden md:table-cell">Matrícula</th>
-                  <th className="text-center font-bold text-red-600">Exámenes (40%)</th>
-                  <th className="text-center font-bold text-green-600">Tareas (30%)</th>
-                  <th className="text-center font-bold text-blue-600">Part. (15%)</th>
-                  <th className="text-center font-bold text-amber-600">Actitud (15%)</th>
+                  <th className="text-center font-bold text-sky-700">Lab ({currentWeights.lab}%)</th>
+                  <th className="text-center font-bold text-purple-700">Proyectos ({currentWeights.project}%)</th>
+                  <th className="text-center font-bold text-red-600">Exámenes ({currentWeights.exam}%)</th>
+                  <th className="text-center font-bold text-emerald-700">Exposiciones ({currentWeights.exposition}%)</th>
+                  <th className="text-center font-bold text-amber-600">Actitud ({currentWeights.attitude}%)</th>
                   <th className="text-center font-black bg-blue-50/50">Nota {selectedPeriod}</th>
                   <th className="text-center font-black hidden xl:table-cell">Promedio Anual</th>
                   <th className="text-center">Estado</th>
@@ -1234,17 +1365,20 @@ export default function GradesPage() {
                         </div>
                       </td>
                       <td className="hidden md:table-cell text-xs text-[var(--color-muted)] font-mono">{student.studentId}</td>
+                      <td className="text-center font-bold text-xs tabular-nums text-sky-700">
+                        {breakdown.categories.lab?.evaluationsCount > 0 ? `${breakdown.categories.lab.pointsEarned.toFixed(1)} / ${currentWeights.lab}` : '—'}
+                      </td>
+                      <td className="text-center font-bold text-xs tabular-nums text-purple-700">
+                        {breakdown.categories.project?.evaluationsCount > 0 ? `${breakdown.categories.project.pointsEarned.toFixed(1)} / ${currentWeights.project}` : '—'}
+                      </td>
                       <td className="text-center font-bold text-xs tabular-nums text-red-600">
-                        {breakdown.categories.exam.evaluationsCount > 0 ? `${breakdown.categories.exam.pointsEarned.toFixed(1)} / 40` : '—'}
+                        {breakdown.categories.exam?.evaluationsCount > 0 ? `${breakdown.categories.exam.pointsEarned.toFixed(1)} / ${currentWeights.exam}` : '—'}
                       </td>
-                      <td className="text-center font-bold text-xs tabular-nums text-green-600">
-                        {breakdown.categories.task.evaluationsCount > 0 ? `${breakdown.categories.task.pointsEarned.toFixed(1)} / 30` : '—'}
-                      </td>
-                      <td className="text-center font-bold text-xs tabular-nums text-blue-600">
-                        {breakdown.categories.participation.evaluationsCount > 0 ? `${breakdown.categories.participation.pointsEarned.toFixed(1)} / 15` : '—'}
+                      <td className="text-center font-bold text-xs tabular-nums text-emerald-700">
+                        {breakdown.categories.exposition?.evaluationsCount > 0 ? `${breakdown.categories.exposition.pointsEarned.toFixed(1)} / ${currentWeights.exposition}` : '—'}
                       </td>
                       <td className="text-center font-bold text-xs tabular-nums text-amber-600">
-                        {breakdown.categories.attitude.evaluationsCount > 0 ? `${breakdown.categories.attitude.pointsEarned.toFixed(1)} / 15` : '—'}
+                        {breakdown.categories.attitude?.evaluationsCount > 0 ? `${breakdown.categories.attitude.pointsEarned.toFixed(1)} / ${currentWeights.attitude}` : '—'}
                       </td>
                       <td className="text-center bg-blue-50/30">
                         {breakdown.hasGrades ? (

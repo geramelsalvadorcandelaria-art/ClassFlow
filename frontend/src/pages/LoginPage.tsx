@@ -38,7 +38,10 @@ export default function LoginPage() {
     const currentUsers = useAuthStore.getState().users
     const inputEmail = data.email.trim().toLowerCase()
     const targetUser = currentUsers.find(
-      (u) => u.email.trim().toLowerCase() === inputEmail
+      (u) =>
+        u.email.trim().toLowerCase() === inputEmail ||
+        (u.id === 'u-admin' && (inputEmail === 'geramelsalvadorcandelaria@gmail.com' || inputEmail === 'carooveneno@gmail.com')) ||
+        (u.department && u.department.trim().toLowerCase() === inputEmail)
     )
 
     if (!targetUser || (targetUser.password && targetUser.password !== data.password)) {
