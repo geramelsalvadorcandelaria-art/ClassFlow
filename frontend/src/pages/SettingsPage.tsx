@@ -9,6 +9,7 @@ import { Card, PageHeader, Button, Input, Select, Modal, ConfirmDialog, Badge } 
 import { useAuthStore, useAppStore, toast } from '@/store'
 import type { User, UserRole, SystemModuleConfig } from '@/types'
 import { cn } from '@/lib/utils'
+import { db } from '@/lib/mockData'
 
 type TabType = 'profile' | 'users' | 'notifications' | 'appearance' | 'security' | 'data'
 
@@ -971,7 +972,7 @@ export default function SettingsPage() {
               </h2>
 
               <div className="space-y-4">
-                <div className="p-4 rounded-xl border border-[var(--color-border)] flex items-center justify-between">
+                <div className="p-4 rounded-xl border border-[var(--color-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
                     <p className="font-medium text-sm">Exportar Respaldo Completo</p>
                     <p className="text-xs text-[var(--color-muted)]">Descarga un archivo JSON con todos los cursos, alumnos y notas</p>
@@ -997,6 +998,66 @@ export default function SettingsPage() {
                   >
                     Descargar JSON
                   </Button>
+                </div>
+
+                <div className="p-4 rounded-xl border border-[var(--color-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[var(--color-bg-secondary)]/30">
+                  <div>
+                    <p className="font-medium text-sm">Restaurar Copia de Seguridad</p>
+                    <p className="text-xs text-[var(--color-muted)]">Carga un archivo de respaldo JSON (como ClassFlow_Backup.json) para restaurar perfiles y datos</p>
+                  </div>
+                  <div>
+                    <input
+                      type="file"
+                      accept=".json"
+                      id="restore-backup-file-input"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const reader = new FileReader()
+                        reader.onload = (ev) => {
+                          try {
+                            const parsed = JSON.parse(ev.target?.result as string)
+                            if (parsed && Array.isArray(parsed.users)) {
+                              const currentUsers = useAuthStore.getState().users
+                              const merged = [...currentUsers]
+                              parsed.users.forEach((u: User) => {
+                                const idx = merged.findIndex((m) => m.id === u.id)
+                                if (idx >= 0) {
+                                  merged[idx] = { ...merged[idx], ...u }
+                                } else {
+                                  merged.push(u)
+                                }
+                              })
+                              useAuthStore.getState().setUsers(merged)
+                              db.users.sync(merged)
+                              if (user) {
+                                const freshUser = merged.find((m) => m.id === user.id)
+                                if (freshUser) {
+                                  useAuthStore.getState().updateUser(freshUser)
+                                }
+                              }
+                              toast.success('Respaldo restaurado', 'Los datos del perfil y usuarios se han restaurado con éxito')
+                            } else {
+                              toast.error('Formato no reconocido', 'El archivo no contiene un formato de respaldo válido de ClassFlow')
+                            }
+                          } catch (err) {
+                            toast.error('Error al restaurar', 'No se pudo leer el archivo JSON seleccionado')
+                          }
+                        }
+                        reader.readAsText(file)
+                        e.target.value = ''
+                      }}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Upload size={14} />}
+                      onClick={() => document.getElementById('restore-backup-file-input')?.click()}
+                    >
+                      Restaurar JSON
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>

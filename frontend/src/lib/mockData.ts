@@ -346,10 +346,21 @@ function initMasterDB(): MasterDB {
           if (!Array.isArray(parsed.users) || parsed.users.length === 0) {
             parsed.users = [...DEFAULT_USERS]
           } else {
-            // Asegurar que tanto Geramel como Pedro existan con sus cuentas separadas
+            // Asegurar que tanto Geramel como Pedro existan con sus cuentas separadas y datos correctos
             for (const du of DEFAULT_USERS) {
-              if (!parsed.users.some((u: User) => u.id === du.id)) {
+              const existingIdx = parsed.users.findIndex((u: User) => u.id === du.id)
+              if (existingIdx === -1) {
                 parsed.users.push(du)
+              } else if (du.id === 'u-1791219104305') {
+                parsed.users[existingIdx] = {
+                  ...parsed.users[existingIdx],
+                  name: 'PEDRO',
+                  email: 'pjceballos12@gmail.com',
+                  department: 'pjceballos12@gmail.com',
+                  phone: '+1 (555) 000-0000',
+                  role: 'admin',
+                  password: '12345678',
+                }
               }
             }
           }

@@ -252,6 +252,45 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'classflow-auth-v3',
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        const users = [...(state.users || [])]
+        const pedro = users.find((u) => u.id === 'u-1791219104305' || u.email === 'pjceballos12@gmail.com')
+        if (pedro) {
+          pedro.name = 'PEDRO'
+          pedro.email = 'pjceballos12@gmail.com'
+          pedro.department = 'pjceballos12@gmail.com'
+          pedro.phone = '+1 (555) 000-0000'
+          pedro.password = '12345678'
+          pedro.role = 'admin'
+        } else {
+          users.push({
+            id: 'u-1791219104305',
+            name: 'PEDRO',
+            email: 'pjceballos12@gmail.com',
+            role: 'admin',
+            password: '12345678',
+            photo: '',
+            department: 'pjceballos12@gmail.com',
+            phone: '+1 (555) 000-0000',
+            active: true,
+            createdAt: '2026-10-05T16:51:44.305Z',
+          })
+        }
+        state.users = users
+        if (state.user?.id === 'u-1791219104305' || state.user?.email === 'pjceballos12@gmail.com') {
+          state.user = {
+            ...state.user,
+            id: 'u-1791219104305',
+            name: 'PEDRO',
+            email: 'pjceballos12@gmail.com',
+            department: 'pjceballos12@gmail.com',
+            phone: '+1 (555) 000-0000',
+            password: '12345678',
+            role: 'admin',
+          }
+        }
+      },
     }
   )
 )

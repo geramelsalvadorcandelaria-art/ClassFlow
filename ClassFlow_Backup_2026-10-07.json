@@ -1,17 +1,7 @@
 {
   "users": [
     {
-      "id": "u-admin",
-      "name": "geramel",
-      "email": "carooveneno@gmail.com",
-      "role": "admin",
-      "photo": "",
-      "department": "geramelsalvadorcandelaria@gmail.com",
-      "phone": "829-505-4822",
-      "active": true,
-      "createdAt": "2026-01-10T00:00:00Z"
-    },
-    {
+      "id": "u-1791219104305",
       "name": "PEDRO",
       "email": "pjceballos12@gmail.com",
       "role": "admin",
@@ -20,8 +10,19 @@
       "active": true,
       "photo": "",
       "password": "12345678",
-      "id": "u-1791219104305",
       "createdAt": "2026-10-05T16:51:44.305Z"
+    },
+    {
+      "id": "u-admin",
+      "name": "geramel",
+      "email": "carooveneno@gmail.com",
+      "role": "admin",
+      "photo": "",
+      "department": "geramelsalvadorcandelaria@gmail.com",
+      "phone": "829-505-4822",
+      "active": true,
+      "password": "admin",
+      "createdAt": "2026-01-10T00:00:00Z"
     }
   ],
   "systemModules": {
